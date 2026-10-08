@@ -1,0 +1,8 @@
+.DS_Store
+
+# Personal Claude Code settings and agent worktrees
+.claude/settings.local.json
+.claude/worktrees/
+
+# Local run data when the workflow runs on this repo
+.trust-factory/ledger.jsonl
