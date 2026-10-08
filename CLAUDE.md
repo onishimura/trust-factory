@@ -14,5 +14,5 @@ This repo is a public showcase of original work. Write every file from `docs/des
 - **Budget.** The core (skill, agents, scripts, example config) stays under approximately 500 lines, not counting `tests/` and `trust-suite/`. Before you add a feature, name the failure that it fixes.
 - **Script first.** When a script can check a fact, write the script; keep model judgment for what a script cannot check.
 - **Portable scripts.** Bash 3.2 (the macOS default) and Python 3.9 standard library, plus `git`, `gh` and `jq`.
-- **Offline tests.** Each script change comes with tests in `tests/` that use local git repos and a `gh` stub. One command runs all tests; run it and see it pass before you report work as done.
+- **Offline tests.** Each script change comes with tests in `tests/` that use local git repos and a `gh` stub. One command (`tests/run.sh`) runs all tests; run it and see it pass before you report work as done.
 - **Writing.** Write documentation in ASD-STE100 Simplified Technical English: short sentences, the active voice, one topic per sentence.

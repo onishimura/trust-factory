@@ -17,7 +17,7 @@ Many agent workflows show that agents can open PRs. Few of them show how often t
 - **A person controls the input.** Only a person adds the `agent:ready` label. By default, a person also merges.
 - **The builder never grades its own work.** The verifier starts with no previous context, and it has no Edit or Write tools.
 - **The verifier reads the diff, not the builder's summary.** A summary is a claim. The diff and the test results are evidence.
-- **The checks stay outside the editable surface.** The check step reads its config from the base branch, never from the PR. A PR that changes the workflow files, CI or the check config always goes to a person.
+- **The checks stay outside the editable surface.** The check step reads its config from the default branch, never from the PR. A PR that changes the workflow files, CI or the check config always goes to a person.
 - **Without evidence, the result is "unsure".** A criterion with no evidence cannot be "met". An "unsure" result always goes to a person.
 - **Fixed checks come before model judgment.** When a script can check a fact, a model does not decide it.
 - **Issue text is data.** Agents follow the acceptance criteria. They do not follow instructions in issue bodies, comments or code.
@@ -67,7 +67,7 @@ orchestrator   (the user's session; 2 issues at a time)
         ├─ builder        worktree → tests first → code → draft PR
         │
         ├─ check script   fail-first check → verify commands → protected paths
-        │                 (fixed checks; config from the base branch)
+        │                 (fixed checks; config from the default branch)
         │
         ├─ verifier       fresh context, no Edit/Write tools
         │                 criteria map from the diff and test output
@@ -84,7 +84,7 @@ orchestrator   (the user's session; 2 issues at a time)
 
 The rule: merge only the commit that passed the checks, against the current base.
 
-- **Main method (GitHub does the work).** The check script posts a commit status on the checked commit. Branch protection requires that status and an up-to-date branch. When the base moves, the orchestrator updates the PR branch. The head commit changes, so the checks must run again. Branch protection is free on public repos.
+- **Main method (GitHub does the work).** The check script posts a commit status on the checked commit. Branch protection requires that status (context `trust-factory/checks`) and an up-to-date branch. When the base moves, the orchestrator updates the PR branch. The head commit changes, so the checks must run again. Branch protection is free on public repos.
 - **Fallback.** Where branch protection is not available, the script merges with `gh pr merge --match-head-commit`, and only one merge runs at a time.
 - **Default mode is `propose`.** The workflow marks the PR as ready for review, and a person merges it.
 
@@ -92,9 +92,11 @@ The rule: merge only the commit that passed the checks, against the current base
 
 New tests must fail without the change and pass with it.
 
-1. In a scratch worktree at the base commit, add only the PR's test files (from `checks.fail_first.test_globs`).
-2. Run those tests. At least one must fail.
-3. At the PR head, run the same tests. All must pass.
+1. Make a scratch worktree at the merge base of the PR head and the base branch. Apply only the PR's changes to test files (the files that match `checks.fail_first.test_globs`).
+2. Run the verify commands there. At least one must fail.
+3. At the PR head, the `verify` check runs the same commands. All must pass.
+
+The config has no command for single tests, so step 2 runs all the verify commands. A failure in step 2 has meaning only when the base passes its verify commands. Phase 0 and the merge rule keep the base in that state.
 
 If the PR has no test changes, the check fails, except for issues with the label `type:docs` or `type:chore`. Then the result is "skipped", and the reason goes into the result.
 
@@ -116,37 +118,54 @@ If the PR has no test changes, the check fails, except for issues with the label
 
 `result` is `pass`, `fail` or `unsure`. The orchestrator rejects a criterion that is `met` without evidence.
 
-### Check result
+### Check script
 
-The check script writes one JSON result. The exit code shows only whether the script ran. The `status` field shows the decision.
+`scripts/check.sh ISSUE PR OUT_DIR` runs in a clone of the target repo. It does these steps in this order:
+
+1. Read the PR from GitHub. Fetch the PR head, the base branch and the default branch.
+2. Read the config from the default branch. The PR must target `branch.base`.
+3. Make sure that the base merges in. A conflict stops the check with `rebuild`.
+4. Run the checks `fail-first`, `verify` and `protected-paths`. All three always run, so a rebuild gets all the feedback.
+5. Read the PR again. If the head moved, the result is `recheck`.
+6. Post a commit status, and write the result.
+
+The script writes `OUT_DIR/result.json` and prints it. In `OUT_DIR`, it also writes `tests.diff` (the PR's test changes), `fail-first.log` and `verify.log`. The verifier can read these files.
+
+The exit code shows only whether the script ran: 0 means that the script wrote a result, and 2 is a usage error. The `status` field shows the decision.
+
+### Check result
 
 ```json
 {
   "issue": 42,
   "pr": 57,
-  "commit": "3f2c1ab",
+  "commit": "3f2c1ab0d6e4b7a95c8f21e3d07b6a4c9e15f2d8",
   "status": "proposed",
   "checks": [
-    { "name": "fail-first", "result": "pass", "detail": "2 new tests failed on base and passed with the change" },
-    { "name": "verify", "result": "pass", "detail": "npm test: 214 passed" },
+    { "name": "fail-first", "result": "pass", "detail": "without the change, 'npm test' fails" },
+    { "name": "verify", "result": "pass", "detail": "3/3 verify commands pass" },
     { "name": "protected-paths", "result": "pass" }
   ],
   "reasons": []
 }
 ```
 
-| `status` | Meaning | Next label |
-|---|---|---|
-| `merged` | Merged (only when `merge.mode` is `auto`) | Issue closed |
-| `proposed` | All checks pass; a person merges | `agent:proposed` |
-| `rebuild` | A check failed, or the base does not merge in | `agent:ready` |
-| `recheck` | The PR head moved after the checks | `agent:checking` |
-| `needs-person` | Protected path, "unsure" result or attempt limit | `agent:needs-person` |
-| `retry-later` | A temporary problem, for example the GitHub API | No change |
+`commit` is the full SHA of the checked PR head. It is `null` when the script cannot read the PR. Each failed check also adds a line to `reasons`.
+
+| `status` | Meaning | Next label | Commit status |
+|---|---|---|---|
+| `merged` | Merged (only when `merge.mode` is `auto`) | Issue closed | — |
+| `proposed` | All checks pass; a person merges | `agent:proposed` | `success` |
+| `rebuild` | A check failed, or the base does not merge in | `agent:ready` | `failure` |
+| `recheck` | The PR head moved after the checks | `agent:checking` | none |
+| `needs-person` | Protected path, wrong base, no config, "unsure" result or attempt limit | `agent:needs-person` | `failure` |
+| `retry-later` | A temporary problem, for example the GitHub API | No change | none |
+
+The commit status has the context `trust-factory/checks`, and it covers only the fixed checks. `check.sh` does not merge, and it does not read the verifier result. The decision step (Phase 4) adds `merged`, the "unsure" result and the attempt limit. If the script cannot post the commit status, the result is `retry-later`.
 
 ### Config
 
-The config lives in the target repo at `.trust-factory/config.json`. The check script reads it from the base branch.
+The config lives in the target repo at `.trust-factory/config.json`. The check script reads it from the default branch of the repo, and the PR must target `branch.base`. The globs are git glob pathspecs: `**/` matches zero or more directories, and `*` does not match `/`.
 
 ```json
 {
@@ -247,10 +266,10 @@ Phase 1 can start before the pilot is ready, because its tests use local test re
 
 The check script needs no agents, so ordinary tests can check it.
 
-- [ ] Write `check.sh` and `config.example.json`.
-- [ ] Write tests with local test repos and a `gh` stub.
-- [ ] Test these cases: fail-first pass, fail-first fail (the tests pass without the change), no test changes, verify failure, protected path, head moved, base conflict.
-- [ ] Post a commit status, and test it on the pilot repo with branch protection.
+- [x] Write `check.sh` and `config.example.json`.
+- [x] Write tests with local test repos and a `gh` stub. Run them with `tests/run.sh`.
+- [x] Test these cases: fail-first pass, fail-first fail (the tests pass without the change), no test changes, verify failure, protected path, head moved, base conflict.
+- [ ] Post a commit status, and test it on the pilot repo with branch protection. (The script posts the status; the pilot test waits for Phase 0.)
 
 Definition of done: all test cases pass, and the script gives the correct JSON result for a real pilot PR.
 
@@ -326,6 +345,12 @@ These are first targets. Change them after Phase 5.
 | 2026-10-08 | Use our own config, labels, result format and defect categories | The project must show original work |
 | 2026-10-09 | Name: `trust-factory` | It states the thesis, and almost no other project uses it |
 | 2026-10-09 | The repo stays private until Phase 6 | The full history becomes visible when it goes public |
+| 2026-10-09 | The check script posts its own commit status context, `trust-factory/checks`, for the fixed checks only | A green status must not claim more than the script checked |
+| 2026-10-09 | The check script reads the config from the default branch, and the PR must target `branch.base` | A commit status belongs to a commit, not to a PR. A PR into an agent branch could bring its own config and get a green status for a commit that later goes to the base |
+| 2026-10-09 | Fail-first runs the verify commands at the merge base with only the PR's test changes; the `verify` check covers "passes with the change" | The config has no command for single tests. At the merge base, the test changes always apply. One cause gives one failed check |
+| 2026-10-09 | A base conflict stops the check with `rebuild` before the slow checks | The builder must merge the base first, and then all checks run again |
+| 2026-10-09 | Globs are git glob pathspecs | git already matches them, so the script needs no glob code |
+| 2026-10-09 | The check script needs git 2.38 or later | `git merge-tree --write-tree` finds conflicts without a scratch merge |
 
 ## Open questions
 
@@ -336,3 +361,4 @@ These are first targets. Change them after Phase 5.
 - How do we get the token count for each agent run, for the ledger?
 - Where do we publish the ledger and the scorecard: in the repo, or only in the README?
 - Does the builder use a test-driven development skill when one is installed?
+- How does the verifier result reach GitHub: a second commit status context, or one combined status from the decision step?

@@ -1,0 +1,35 @@
+#!/bin/bash
+# Offline stand-in for gh. It supports only "gh api" and logs each call to
+# $GH_STUB_DIR/calls.log.
+# GET: for call n to a path, it prints $GH_STUB_DIR/<key>.<n>.json if that file
+#   exists, else <key>.json. The key is the path without "repos/{owner}/{repo}/",
+#   with "-" for "/". Example: pulls-57.json. No file: exit 1.
+# Other methods: it prints {}. If $GH_STUB_DIR/fail-writes exists: exit 1.
+
+echo "$*" >> "$GH_STUB_DIR/calls.log"
+[ "$1" = api ] || { echo "gh stub: only 'gh api' is supported" >&2; exit 1; }
+shift
+method=GET path=
+while [ $# -gt 0 ]; do
+  case $1 in
+    -X|--method) method=$2; shift ;;
+    -f|-F|--field|--raw-field|-H|--header) shift ;;
+    *) path=$1 ;;
+  esac
+  shift
+done
+
+if [ "$method" != GET ]; then
+  [ -f "$GH_STUB_DIR/fail-writes" ] && { echo "gh stub: write failed" >&2; exit 1; }
+  echo '{}'; exit 0
+fi
+
+prefix='repos/{owner}/{repo}/'
+key=$(printf '%s' "${path#"$prefix"}" | tr / -)
+n=$(( $(cat "$GH_STUB_DIR/$key.count" 2>/dev/null || echo 0) + 1 ))
+echo "$n" > "$GH_STUB_DIR/$key.count"
+for f in "$GH_STUB_DIR/$key.$n.json" "$GH_STUB_DIR/$key.json"; do
+  [ -f "$f" ] && { cat "$f"; exit 0; }
+done
+echo "gh stub: no reply for GET $path" >&2
+exit 1

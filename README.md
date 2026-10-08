@@ -2,7 +2,7 @@
 
 **An agent workflow that measures how much you can trust it.**
 
-> **Status:** design and setup (Phase 0). Nothing runs yet. The full design is in [`docs/design.md`](docs/design.md).
+> **Status:** Phase 1. The check script (`scripts/check.sh`) runs, and offline tests check it (`tests/run.sh`). The agents do not exist yet. The full design is in [`docs/design.md`](docs/design.md).
 
 trust-factory is a small Claude Code workflow for GitHub repos. A person marks an issue as ready. A builder agent makes the change in its own worktree and opens a draft PR. Fixed checks run first. Then a verifier agent, which cannot edit code, connects each acceptance criterion to evidence. Every run writes a record, and a seeded test suite measures how well the verifier finds bad PRs.
 
@@ -19,7 +19,7 @@ Many agent workflows show that agents can open PRs. Few of them show how often t
 | Phase | Goal | Status |
 |---|---|---|
 | 0 | Decisions and pilot setup | In progress |
-| 1 | Check script and result format | Not started |
+| 1 | Check script and result format | In progress |
 | 2 | Builder agent | Not started |
 | 3 | Verifier agent and trust suite | Not started |
 | 4 | Orchestrator and run ledger | Not started |
