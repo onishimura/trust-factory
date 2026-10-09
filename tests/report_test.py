@@ -1,10 +1,12 @@
 """Offline tests for scripts/report.py."""
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
@@ -73,10 +75,71 @@ class ScorecardTest(unittest.TestCase):
         self.assertIn("Unsure rate: 1/4 (25%)", text)
         self.assertIn("Invalid verdicts: 0/4 (0%)", text)
 
+    def test_verdict_command(self):
+        good, bad = self.dir / "good.json", self.dir / "bad.json"
+        good.write_text(json.dumps(verdict("pass")))
+        bad.write_text(json.dumps(verdict("pass", evidence="")))
+        run = [sys.executable, str(SCRIPTS / "report.py"), "verdict"]
+        self.assertEqual(subprocess.run(run + [str(good)]).returncode, 0)
+        result = subprocess.run(run + [str(bad)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("met without evidence", result.stderr)
+
     def test_usage_error(self):
         run = subprocess.run([sys.executable, str(SCRIPTS / "report.py")], capture_output=True, text=True)
         self.assertEqual(run.returncode, 2)
         self.assertIn("usage", run.stderr)
+
+
+
+def record(issue, status, attempts, pr=None, verdicts=(), started="2026-10-09T10:00:00Z", finished="2026-10-09T10:06:00Z"):
+    return {"issue": issue, "started": started, "finished": finished, "attempts": attempts, "tokens": 1000,
+            "cost_usd": 0.25, "checks": [], "verdicts": list(verdicts), "reasons": [], "status": status, "pr": pr}
+
+
+class LedgerTest(unittest.TestCase):
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.dir)
+        self.gh = self.dir / "gh"
+        self.gh.mkdir()
+        bin_dir = Path(__file__).resolve().parent / "bin"
+        patcher = unittest.mock.patch.dict("os.environ", {
+            "PATH": "%s:%s" % (bin_dir, os.environ["PATH"]), "GH_STUB_DIR": str(self.gh)})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.ledger = self.dir / "ledger.jsonl"
+        lines = [record(42, "rebuild", 1, 142, ["fail"]), record(42, "proposed", 2, 142, ["fail", "pass"]),
+                 record(43, "needs-person", 1, finished="2026-10-09T10:02:00Z")]
+        self.ledger.write_text("".join(json.dumps(r) + "\n" for r in lines))
+
+    def reply(self, key, value):
+        (self.gh / (key + ".json")).write_text(json.dumps(value))
+
+    def test_last_record_of_each_issue(self):
+        self.reply("pulls-142", {"merged_at": None})
+        records = report.ledger(self.ledger)
+        self.assertEqual([(r["issue"], r["status"], r["attempts"]) for r in records],
+                         [(42, "proposed", 2), (43, "needs-person", 1)])
+        self.assertIsNone(records[0].get("human_edits"))
+
+    def test_merged_pr_with_a_person_commit(self):
+        self.reply("pulls-142", {"merged_at": "2026-10-09T11:00:00Z"})
+        self.reply("pulls-142-commits", [{"commit": {"author": {"name": report.BUILDER}}},
+                                         {"commit": {"author": {"name": "A Person"}}}])
+        r = report.ledger(self.ledger)[0]
+        self.assertEqual((r["status"], r["human_edits"]), ("merged", True))
+
+    def test_report_text(self):
+        self.reply("pulls-142", {"merged_at": "2026-10-09T11:00:00Z"})
+        self.reply("pulls-142-commits", [{"commit": {"author": {"name": report.BUILDER}}}])
+        text = report.ledger_report(report.ledger(self.ledger))
+        self.assertIn("| #42 | #142 | merged | 2 | fail, pass | 1000 | $0.25 | 6.0 | no |", text)
+        self.assertIn("| #43 | - | needs-person | 1 |  | 1000 | $0.25 | 2.0 | - |", text)
+        self.assertIn("Proposed or merged: 1/2 (50%)", text)
+        self.assertIn("Attempts: 1.5 for each issue on average.", text)
+        self.assertIn("Time: 4.0 minutes", text)
+        self.assertIn("Merged PRs with human edits: 0/1 (0%)", text)
 
 
 if __name__ == "__main__":

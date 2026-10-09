@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-"""Summaries for trust-factory. See docs/design.md, "Trust suite".
+"""Summaries for trust-factory. See docs/design.md, "Trust suite" and "Run ledger".
 
 Usage: report.py scorecard CASES_DIR RESULTS_DIR
+       report.py verdict FILE      (exit 1 when the criteria map is not valid)
+       report.py ledger FILE       (run it in a clone of the target repo; it reads merged PRs with gh)
 """
 import json
+import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 RESULTS = ("pass", "fail", "unsure")
+BUILDER = "trust-factory builder"
+USAGE = __doc__.split("Usage: ")[1]
 
 
 def problem(verdict):
@@ -69,8 +75,62 @@ def scorecard(rows):
         "- Invalid verdicts: %s." % rate([r for r in rows if r["problem"]], rows)])
 
 
+def gh(path):
+    run = subprocess.run(["gh", "api", "repos/{owner}/{repo}/" + path], capture_output=True, text=True)
+    return json.loads(run.stdout) if run.returncode == 0 else None
+
+
+def ledger(path):
+    """Return the last record of each issue. A merged PR gets the status "merged" and human_edits."""
+    last = {}
+    for line in Path(path).read_text().splitlines():
+        if line.strip():
+            record = json.loads(line)
+            last[record["issue"]] = record
+    for r in last.values():
+        pr = gh("pulls/%d" % r["pr"]) if r.get("pr") else None
+        if pr and pr.get("merged_at"):
+            r["status"] = "merged"
+            commits = gh("pulls/%d/commits" % r["pr"]) or []
+            r["human_edits"] = any(c["commit"]["author"]["name"] != BUILDER for c in commits)
+    return [last[k] for k in sorted(last)]
+
+
+def minutes(r):
+    start, end = (datetime.fromisoformat(r[k].replace("Z", "+00:00")) for k in ("started", "finished"))
+    return (end - start).total_seconds() / 60
+
+
+def ledger_report(records):
+    lines = ["| Issue | PR | Status | Attempts | Verdicts | Tokens | Cost | Minutes | Human edits |",
+             "|---|---|---|---|---|---|---|---|---|"]
+    for r in records:
+        lines.append("| #%d | %s | %s | %d | %s | %d | $%.2f | %.1f | %s |" % (
+            r["issue"], "#%d" % r["pr"] if r.get("pr") else "-", r["status"], r["attempts"],
+            ", ".join(str(v) for v in r["verdicts"]), r["tokens"], r["cost_usd"], minutes(r),
+            {True: "yes", False: "no"}.get(r.get("human_edits"), "-")))
+    done = [r for r in records if r["status"] in ("proposed", "merged")]
+    merged = [r for r in records if r["status"] == "merged"]
+    n = len(records) or 1
+    return "\n".join(lines + [
+        "",
+        "- Proposed or merged: %s of the issues." % rate(done, records),
+        "- Attempts: %.1f for each issue on average." % (sum(r["attempts"] for r in records) / n),
+        "- Tokens: %d. Cost: $%.2f. Time: %.1f minutes for each issue on average." % (
+            sum(r["tokens"] for r in records), sum(r["cost_usd"] for r in records),
+            sum(minutes(r) for r in records) / n),
+        "- Merged PRs with human edits: %s." % rate([r for r in merged if r.get("human_edits")], merged)])
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 4 or sys.argv[1] != "scorecard":
-        print("usage: report.py scorecard CASES_DIR RESULTS_DIR", file=sys.stderr)
+    command = sys.argv[1:2] + [str(len(sys.argv) - 2)]
+    if command == ["scorecard", "2"]:
+        print(scorecard(score(sys.argv[2], sys.argv[3])))
+    elif command == ["verdict", "1"]:
+        why = problem(load(sys.argv[2]))
+        sys.exit("not valid: " + why if why else 0)
+    elif command == ["ledger", "1"]:
+        print(ledger_report(ledger(sys.argv[2])))
+    else:
+        print("usage: " + USAGE, file=sys.stderr, end="")
         sys.exit(2)
-    print(scorecard(score(sys.argv[2], sys.argv[3])))

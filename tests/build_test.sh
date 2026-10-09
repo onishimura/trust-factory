@@ -21,7 +21,8 @@ setup() { # NAME: make the repos with a config on main, and an issue with criter
   git clone -q "$T/origin.git" "$T/clone"
   jq -n '{number: 42, title: "Add a greeting", body: "## Goal\nGreet.\n\n## Acceptance criteria\n- [ ] Prints hello\n"}' \
     > "$T/gh/issues-42.json"
-  echo '{"number": 57}' > "$T/gh/pulls.post.json"
+  echo '{"number": 57}' > "$T/gh/pulls.write.json"
+  echo '[]' > "$T/gh/pulls-state-open-per_page-100.json"
   echo '{"status": "done", "title": "Add a greeting", "summary": "## Summary\n- Added hello.sh."}' \
     > "$CLAUDE_STUB_DIR/output.json"
   act 'echo hello > hello.sh && mkdir -p tests && echo test > tests/hello.test && git add -A && git commit -qm "Add hello"'
@@ -78,6 +79,23 @@ test_prompt_and_permissions() {
   contains "no prompts" "$log" "arg: none"
   case $log in *"arg: Bash(git:*)"* | *"arg: bypassPermissions"*) fail "the builder has too many permissions" ;; esac
   grep -q '^## Output' "$CLAUDE_STUB_DIR/system-prompt.md" || fail "the system prompt is not the builder body"
+}
+
+test_rebuild_gets_feedback_and_updates_the_open_pr() {
+  echo '[{"number": 3, "head": {"ref": "agent/7"}}, {"number": 57, "head": {"ref": "agent/42"}}]' \
+    > "$T/gh/pulls-state-open-per_page-100.json"
+  printf '%s\n' "verify: 'sh run-tests.sh' fails" "false claim: the README changed" > "$T/feedback.txt"
+  (cd "$T/clone" && "$BUILD" 42 "$T/feedback.txt") > "$T/stdout" 2> "$T/stderr"
+  expect status "$(field .status)" opened
+  expect pr "$(field .pr)" 57
+  expect "PR posts" "$(pr_posts)" 0
+  grep -q '^api repos/{owner}/{repo}/pulls/57 -X PATCH' "$T/gh/calls.log" || fail "the open PR was not updated"
+  contains feedback "$(log)" $'<feedback>\nverify: \'sh run-tests.sh\' fails\nfalse claim: the README changed\n</feedback>'
+}
+
+test_first_attempt_has_no_feedback() {
+  run_build
+  case $(log) in *"<feedback>"*) fail "the first attempt got feedback" ;; esac
 }
 
 test_issue_without_criteria() {

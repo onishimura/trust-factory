@@ -1,13 +1,14 @@
 #!/bin/bash
-# build.sh: run the builder agent on one issue, then push its branch and open a draft PR.
+# build.sh: run the builder agent on one issue, then push its branch and open (or update) a draft PR.
 # See docs/design.md, "Build script".
-# Usage: build.sh ISSUE   (run it in a clone of the target repo, with the verify tools on PATH)
+# Usage: build.sh ISSUE [FEEDBACK_FILE]   (in a clone of the target repo, with the verify tools on PATH)
+# FEEDBACK_FILE holds the reasons why the last attempt failed, one for each line.
 # It prints one JSON result. Exit 0: a result was printed. Exit 2: usage error.
 set -uo pipefail
 
-usage() { echo "usage: build.sh ISSUE (in a clone of the target repo)" >&2; exit 2; }
-[ $# -eq 1 ] && git rev-parse --git-dir > /dev/null 2>&1 || usage
-issue=$1 branch= head=
+usage() { echo "usage: build.sh ISSUE [FEEDBACK_FILE] (in a clone of the target repo)" >&2; exit 2; }
+[ $# -ge 1 ] && [ $# -le 2 ] && git rev-parse --git-dir > /dev/null 2>&1 || usage
+issue=$1 feedback=${2:-/dev/null} branch= head=
 case $issue in '' | *[!0-9]*) usage ;; esac
 here=$(cd "$(dirname "$0")" && pwd)
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/build.XXXXXX") || exit 1
@@ -50,12 +51,14 @@ base_sha=$(git rev-parse "$ref/base")
 git worktree add -q -B "$branch" "$wt" "$base_sha" || finish needs-person "could not make a worktree for $branch"
 
 # Run the builder in the worktree. It can edit files there and run only the allowed commands.
-jq -n --slurpfile i "$tmp/issue.json" --arg base "$base_sha" --slurpfile c "$cfg" -r '
+jq -n --slurpfile i "$tmp/issue.json" --arg base "$base_sha" --slurpfile c "$cfg" --rawfile fb "$feedback" -r '
   "Build issue #\($i[0].number). The base commit is \($base).\n\n" +
   "Verify commands (run them in this directory; all must pass):\n" + ($c[0].checks.verify | map("- " + .) | join("\n")) +
   "\n\nProtected paths (do not change them):\n" + ($c[0].merge.protected_paths // [] | map("- " + .) | join("\n")) +
   "\n\nYou can run these commands, one for each Bash call: git add, git commit, git diff, git status, git log " +
-  "and the verify commands.\n\n<issue>\n# \($i[0].title)\n\n\($i[0].body // "")\n</issue>"' > "$tmp/prompt.txt"
+  "and the verify commands.\n\n<issue>\n# \($i[0].title)\n\n\($i[0].body // "")\n</issue>" +
+  (if $fb == "" then "" else "\n\nThis is a new attempt, from the base again. The last attempt failed for " +
+    "these reasons. Fix them:\n<feedback>\n\($fb)</feedback>" end)' > "$tmp/prompt.txt"
 allowed=(Read Grep Glob Edit Write "Bash(git add:*)" "Bash(git commit:*)" "Bash(git diff:*)" "Bash(git status:*)" "Bash(git log:*)")
 while IFS= read -r cmd; do allowed+=("Bash($cmd:*)"); done < <(jq -r '.checks.verify[]' "$cfg")
 python3 "$here/agent.py" "$here/../agents/builder.md" > "$tmp/agent.json" || exit 1
@@ -78,9 +81,17 @@ head=$(git -C "$wt" rev-parse HEAD)
 git merge-base --is-ancestor "$base_sha" "$head" && [ "$head" != "$base_sha" ] \
   || finish needs-person "the builder made no commits on top of $base"
 
-git push -q origin "+$head:refs/heads/$branch" || finish retry-later "could not push $branch"
-api pulls -X POST -f title="$(out .title)" -f head="$branch" -f base="$base" -F draft=true \
-  -f body="$(out .summary)
+# A rebuild replaces the branch and updates the open PR of the branch.
+pr=$(api "pulls?state=open&per_page=100" | jq -r --arg b "$branch" 'first(.[] | select(.head.ref == $b) | .number) // empty') \
+  || finish retry-later "could not list the open PRs"
+git push -q origin "+$head:refs/heads/$branch" 2> /dev/null || finish retry-later "could not push $branch"
+fields=(-f title="$(out .title)" -f body="$(out .summary)
 
-Closes #$issue" > "$tmp/pr.json" || finish retry-later "could not open the draft PR"
-finish opened "" "$(jq -r .number "$tmp/pr.json")"
+Closes #$issue")
+if [ -n "$pr" ]; then
+  api "pulls/$pr" -X PATCH "${fields[@]}" > "$tmp/pr.json" || finish retry-later "could not update PR #$pr"
+else
+  api pulls -X POST -f head="$branch" -f base="$base" -F draft=true "${fields[@]}" > "$tmp/pr.json" \
+    || finish retry-later "could not open the draft PR"
+fi
+finish opened "" "${pr:-$(jq -r .number "$tmp/pr.json")}"

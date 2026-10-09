@@ -1,35 +1,47 @@
 #!/bin/bash
-# Offline stand-in for gh. It supports only "gh api" and logs each call to
-# $GH_STUB_DIR/calls.log.
-# GET: for call n to a path, it prints $GH_STUB_DIR/<key>.<n>.json if that file
-#   exists, else <key>.json. The key is the path without "repos/{owner}/{repo}/",
-#   with "-" for "/". Example: pulls-57.json. No file: exit 1.
-# Other methods: it prints $GH_STUB_DIR/<key>.post.json if that file exists, else {}.
-#   If $GH_STUB_DIR/fail-writes exists: exit 1.
+# Offline stand-in for gh. It supports "gh api" and "gh pr ready", and it logs
+# each call to $GH_STUB_DIR/calls.log. Replies come from files in $GH_STUB_DIR.
+# The key of a path drops "repos/{owner}/{repo}/" and uses "-" for "/", "?",
+# "&" and "=". Examples: pulls-57, pulls-state-open-per_page-100.
+# GET: run <key>.sh if it exists. Else print <key>.<n>.json for call n if that
+#   file exists, else <key>.json. No file: exit 1.
+# Other methods: if $GH_STUB_DIR/fail-writes exists, exit 1. Else run
+#   <key>.write.sh with the arguments, or print <key>.write.json, or print {}.
+# A body from stdin (--input - or -F body=@-) goes to <key>.input (the last
+# one) and is added to <key>.inputs.
 
 echo "$*" >> "$GH_STUB_DIR/calls.log"
-[ "$1" = api ] || { echo "gh stub: only 'gh api' is supported" >&2; exit 1; }
+[ "$1 $2" = "pr ready" ] && exit 0
+[ "$1" = api ] || { echo "gh stub: only 'gh api' and 'gh pr ready' are supported" >&2; exit 1; }
 shift
-method=GET path=
+args=("$@") method=GET path= stdin=
 while [ $# -gt 0 ]; do
   case $1 in
-    -X|--method) method=$2; shift ;;
-    -f|-F|--field|--raw-field|-H|--header) shift ;;
+    -X | --method) method=$2; shift ;;
+    --input) [ "$2" = - ] && stdin=1; shift ;;
+    -f | -F | --field | --raw-field) case $2 in *=@-) stdin=1 ;; esac; shift ;;
+    -H | --header) shift ;;
     *) path=$1 ;;
   esac
   shift
 done
 
 prefix='repos/{owner}/{repo}/'
-key=$(printf '%s' "${path#"$prefix"}" | tr / -)
+key=$(printf '%s' "${path#"$prefix"}" | tr '/?&=' '----')
+dir=$GH_STUB_DIR
+# Read all of stdin first, as a real request does, so that a GET earlier in the same pipeline is done.
+if [ -n "$stdin" ]; then body=$(cat); printf '%s\n' "$body" > "$dir/$key.input"; printf '%s\n' "$body" >> "$dir/$key.inputs"; fi
 if [ "$method" != GET ]; then
-  [ -f "$GH_STUB_DIR/fail-writes" ] && { echo "gh stub: write failed" >&2; exit 1; }
-  cat "$GH_STUB_DIR/$key.post.json" 2> /dev/null || echo '{}'
+  [ -f "$dir/fail-writes" ] && { echo "gh stub: write failed" >&2; exit 1; }
+  if [ -f "$dir/$key.write.sh" ]; then bash "$dir/$key.write.sh" "${args[@]}"
+  else cat "$dir/$key.write.json" 2> /dev/null || echo '{}'; fi
   exit 0
 fi
-n=$(( $(cat "$GH_STUB_DIR/$key.count" 2>/dev/null || echo 0) + 1 ))
-echo "$n" > "$GH_STUB_DIR/$key.count"
-for f in "$GH_STUB_DIR/$key.$n.json" "$GH_STUB_DIR/$key.json"; do
+
+[ -f "$dir/$key.sh" ] && exec bash "$dir/$key.sh"
+n=$(($(cat "$dir/$key.count" 2> /dev/null || echo 0) + 1))
+echo "$n" > "$dir/$key.count"
+for f in "$dir/$key.$n.json" "$dir/$key.json"; do
   [ -f "$f" ] && { cat "$f"; exit 0; }
 done
 echo "gh stub: no reply for GET $path" >&2

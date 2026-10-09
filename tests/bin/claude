@@ -1,23 +1,33 @@
 #!/bin/bash
 # Offline stand-in for "claude -p". In $CLAUDE_STUB_DIR, it logs the directory,
 # the git author, the arguments and the files that the PR changes (calls.log),
-# and it saves the --system-prompt value (system-prompt.md). If act.sh exists,
-# it runs it in the current directory, as an agent would act. It prints a result
-# whose structured output is $CLAUDE_STUB_DIR/output.json, and whose permission
-# denials are $CLAUDE_STUB_DIR/denials.json (default: none).
+# and it saves the --system-prompt value (system-prompt.md).
+# The role is "builder" or "verifier", from the first line of the system prompt.
+# For call n of a role, the structured output is <role>.<n>.json, else
+# <role>.json, else output.json. Before it replies, it runs <role>.sh (else
+# act.sh) in the current directory, as an agent would act. The permission
+# denials come from denials.json (default: none).
 
+dir=$CLAUDE_STUB_DIR
 {
   echo "cwd: $PWD"
   echo "author: ${GIT_AUTHOR_NAME:-}"
   printf 'arg: %s\n' "$@"
-  echo "changed: $(git diff --name-only main...HEAD | paste -sd ' ' -)"
-} >> "$CLAUDE_STUB_DIR/calls.log"
+  echo "changed: $(git diff --name-only main...HEAD 2> /dev/null | paste -sd ' ' -)"
+} >> "$dir/calls.log"
+role=agent
 while [ $# -gt 0 ]; do
-  [ "$1" = --system-prompt ] && printf '%s\n' "$2" > "$CLAUDE_STUB_DIR/system-prompt.md"
+  if [ "$1" = --system-prompt ]; then
+    printf '%s\n' "$2" > "$dir/system-prompt.md"
+    case $2 in "You are the builder"*) role=builder ;; "You are the verifier"*) role=verifier ;; esac
+  fi
   shift
 done
-[ ! -f "$CLAUDE_STUB_DIR/act.sh" ] || bash "$CLAUDE_STUB_DIR/act.sh" > /dev/null
-[ -f "$CLAUDE_STUB_DIR/denials.json" ] || echo '[]' > "$CLAUDE_STUB_DIR/denials.json"
-jq -n --slurpfile v "$CLAUDE_STUB_DIR/output.json" --slurpfile d "$CLAUDE_STUB_DIR/denials.json" \
+n=$(($(cat "$dir/$role.count" 2> /dev/null || echo 0) + 1))
+echo "$n" > "$dir/$role.count"
+for act in "$dir/$role.sh" "$dir/act.sh"; do [ -f "$act" ] && { bash "$act" > /dev/null; break; }; done
+for out in "$dir/$role.$n.json" "$dir/$role.json" "$dir/output.json"; do [ -f "$out" ] && break; done
+[ -f "$dir/denials.json" ] || echo '[]' > "$dir/denials.json"
+jq -n --slurpfile v "$out" --slurpfile d "$dir/denials.json" \
   '{type: "result", is_error: false, structured_output: $v[0], permission_denials: $d[0],
     total_cost_usd: 0.25, usage: {input_tokens: 1000, output_tokens: 200}}'

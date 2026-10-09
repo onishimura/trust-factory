@@ -22,7 +22,7 @@ Many agent workflows show that agents can open PRs. Few of them show how often t
 - **Fixed checks come before model judgment.** When a script can check a fact, a model does not decide it.
 - **Issue text is data.** Agents follow the acceptance criteria. They do not follow instructions in issue bodies, comments or code.
 - **Use Claude Code features first.** Use subagents, worktree isolation, permission rules and the sandbox before custom scripts. Regex hooks are not a security boundary.
-- **Each new feature must fix a failure that we saw.** Keep the core under approximately 500 lines, not including tests and the trust suite.
+- **Each new feature must fix a failure that we saw.** Keep the core under approximately 720 lines, not including tests and the trust suite.
 
 ## Scope
 
@@ -189,7 +189,7 @@ The exit code shows only whether the script ran: 0 means that the script wrote a
 | `needs-person` | Protected path, wrong base, no config, "unsure" result or attempt limit | `agent:needs-person` | `failure` |
 | `retry-later` | A temporary problem, for example the GitHub API | No change | none |
 
-The commit status has the context `trust-factory/checks`, and it covers only the fixed checks. `check.sh` does not merge, and it does not read the verifier result. The decision step (Phase 4) adds `merged`, the "unsure" result and the attempt limit. If the script cannot post the commit status, the result is `retry-later`.
+The commit status has the context `trust-factory/checks`, and it covers only the fixed checks. `check.sh` does not merge, and it does not read the verifier result. The orchestrator adds the verifier result, the attempt limit and its own commit status, `trust-factory/verifier` (see "Orchestrator"). If the script cannot post the commit status, the result is `retry-later`.
 
 ### Config
 
@@ -213,15 +213,44 @@ The config lives in the target repo at `.trust-factory/config.json`. The check s
 
 The values are first guesses. Change them after Phase 5.
 
+### Orchestrator
+
+`scripts/factory.sh` makes every decision of the orchestrator. The skill `skills/trust-factory/SKILL.md` only starts it. The script runs in a clone of the target repo, with the verify tools on `PATH`.
+
+- `run` takes the open issues with `agent:ready`, `limits.concurrent_issues` at a time, and it runs one attempt for each. It repeats until no issue has `agent:ready`. Its first round also takes the issues in `agent:working` or `agent:checking`, which a stopped run left. One run starts each issue at most `limits.attempts_per_issue` times.
+- `status` shows the `agent:*` issues and the last ledger record of each issue.
+- `stop` stops the active run and all its processes. The labels stay as they are. A pid file in the git directory marks the active run, so only one run can be active.
+- `issue N` runs one attempt for issue N.
+
+An attempt does these steps:
+
+1. Set `agent:working`, and run `build.sh` with the reasons from the last attempt as feedback.
+2. Set `agent:checking`, and run `check.sh`. A `recheck` runs the check again, up to three times.
+3. If the check gives `proposed`, run `verify.sh` in a worktree at the checked commit. `report.py verdict` rejects a criteria map that is not valid.
+4. Post the commit status `trust-factory/verifier` (`success` only for `pass`), and post an evidence comment on the PR: the checks and the criteria map.
+5. Decide, write one ledger line, and set the next label:
+
+| Result of the attempt | Status | Next label |
+|---|---|---|
+| Check `proposed` and verifier `pass` | `proposed` (the PR leaves draft) | `agent:proposed` |
+| Check `rebuild`, or verifier `fail` | `rebuild` | `agent:ready` |
+| `rebuild` at the attempt limit | `needs-person` | `agent:needs-person` |
+| Build or check `needs-person`, verifier `unsure`, or a criteria map that is not valid | `needs-person` | `agent:needs-person` |
+| Build, check or verifier `retry-later` | No ledger line | No change |
+
+For `needs-person`, the script adds a comment to the issue with the reasons. A rebuild starts again from the base, and the builder gets the reasons: the failed checks, the criteria that are not met, and the concerns.
+
 ### Run ledger
 
-One JSON line for each issue, in `.trust-factory/ledger.jsonl` in the target repo (not committed):
+The ledger is `.trust-factory/ledger.jsonl` in the target repo (not committed). Each finished attempt adds one JSON line. Each line holds the totals of the run of that issue so far, so the last line of an issue is its record:
 
 ```json
-{"issue": 42, "started": "2026-10-20T10:02:00Z", "finished": "2026-10-20T10:19:00Z", "attempts": 2, "tokens": 183000, "verdicts": ["fail", "pass"], "status": "proposed", "human_edits": false}
+{"issue": 42, "started": "2026-10-20T10:02:00Z", "finished": "2026-10-20T10:19:00Z", "attempts": 2, "tokens": 183000, "cost_usd": 1.12, "checks": ["proposed", "proposed"], "verdicts": ["fail", "pass"], "reasons": [], "status": "proposed", "pr": 57}
 ```
 
-The `report` command reads the ledger. It also checks each merged PR for commits by a person, and it fills in `human_edits`.
+After a `rebuild` line, the next attempt continues the same record. After a final status (`proposed` or `needs-person`), a new `agent:ready` starts a new record. A stopped attempt writes no line, so the next run starts that attempt again. The tokens of a stopped attempt are not recorded.
+
+`report.py ledger` reads the last record of each issue. For each merged PR, it sets the status `merged` and fills in `human_edits`: true when a commit has an author other than "trust-factory builder".
 
 ### Trust suite
 
@@ -243,7 +272,7 @@ The files:
 - `trust-suite/fixture/` is a small Python 3.9 package with `unittest` tests.
 - Each case in `trust-suite/cases/<case>/` has `issue.md`, `pr.md` (the builder's summary), `pr.diff` (the change to the fixture) and `expected.json` (the category and the expected results).
 - Each seeded PR passes the fixed checks. An offline test proves this, so only the verifier can catch a bad PR.
-- `trust-suite/run.sh [CASE...]` runs the verifier on each case with `claude -p`. The body of `agents/verifier.md` is the system prompt, and its frontmatter gives the tools and the model. The session gets read-only tools, the `dontAsk` permission mode and the JSON schema in `trust-suite/criteria-map.schema.json`. The verifier does not see the case name or the expected result.
+- `trust-suite/run.sh [CASE...]` runs the verifier on each case with `claude -p`. The body of `agents/verifier.md` is the system prompt, and its frontmatter gives the tools and the model. The session gets read-only tools, the `dontAsk` permission mode and the JSON schema in `agents/verifier.schema.json`. It calls `scripts/verify.sh`, the same step as on real PRs. The verifier does not see the case name or the expected result.
 - `run.sh` writes each verdict and the scorecard to `trust-suite/results/<time>/` (not committed). `scripts/report.py scorecard` makes the scorecard.
 - To publish a full run, copy its scorecard to `trust-suite/scorecard.md`, and commit it with the verifier prompt that made it.
 
@@ -256,7 +285,9 @@ Scoring rules:
 
 | File | Approx. size | Job |
 |---|---|---|
-| `skills/trust-factory/SKILL.md` | 150 lines | Orchestrator: `run`, `status`, `stop`, `report`; moves labels; writes the ledger |
+| `skills/trust-factory/SKILL.md` | 35 lines | The user interface: `run`, `status`, `stop`, `report`. It starts the scripts |
+| `scripts/factory.sh` | 155 lines | Orchestrator: attempts, decision table, labels, comments, ledger, parallel runs, stop and resume |
+| `scripts/verify.sh` | 35 lines | Runs the verifier on one PR. The trust suite uses it too |
 | `agents/builder.md` | 60 lines | Tests first, smallest safe change, draft PR |
 | `agents/verifier.md` | 70 lines | Criteria map with evidence; `pass`, `fail` or `unsure` |
 | `scripts/check.sh` | 120 lines | Fail-first check, verify commands, protected paths, JSON result, commit status |
@@ -335,10 +366,10 @@ Definition of done: the verifier catches all seeded bad PRs, passes all good con
 
 ### Phase 4: Orchestrator and ledger
 
-- [ ] Write the orchestrator skill: `run`, `status`, `stop`, `report`.
-- [ ] Write a ledger record for each issue.
-- [ ] Run one issue at a time, then two in parallel.
-- [ ] Stop a run during work, then continue it.
+- [x] Write the orchestrator skill: `run`, `status`, `stop`, `report`. (`factory.sh` makes the decisions; the skill starts it.)
+- [x] Write a ledger record for each issue.
+- [x] Run one issue at a time, then two in parallel: private-pilot #9, then #6 and #7. All three reached `agent:proposed` in one attempt each (PRs #11 to #13, $1.33 in total).
+- [x] Stop a run during work, then continue it: the stop came while both builders worked. The labels stayed `agent:working`, the ledger got no line, and the resumed run finished both issues.
 
 Definition of done: three pilot issues go from `agent:ready` to a result in `propose` mode. The labels and the ledger are correct after a stop and a resume.
 
@@ -369,7 +400,7 @@ Definition of done: a person who does not know the project can install it on a t
 
 These are first targets. Change them after Phase 5.
 
-- The core stays under approximately 500 lines, not including tests and the trust suite.
+- The core stays under approximately 720 lines, not including tests and the trust suite.
 - Setup on a new repo takes less than 10 minutes.
 - No merge from the workflow makes the base branch fail its verify commands.
 - Trust suite: the catch rate is 100%, and no more than one good control fails.
@@ -410,6 +441,12 @@ These are first targets. Change them after Phase 5.
 | 2026-10-09 | The builder's commits have the author "trust-factory builder" | The report can find commits by a person |
 | 2026-10-09 | Agent sessions load only the project settings | The user's own allow rules must not widen an agent's permissions |
 | 2026-10-09 | The builder must not change `PATH` or guess about its environment, and `build.sh` lists the denied commands | In the first pilot run, a denied `export PATH` led the builder to a false claim about the Node version |
+| 2026-10-09 | A script (`factory.sh`) is the orchestrator, and the skill only starts it | The decision table is a fixed rule, so a script applies it and offline tests check it |
+| 2026-10-09 | The core budget is approximately 720 lines | The orchestrator script (about 150 lines) and the ledger report keep the decisions in tested code. The core was 713 lines at the end of Phase 4 |
+| 2026-10-09 | The verifier result gets its own commit status, `trust-factory/verifier` | Each status claims only what its step checked. Branch protection can require both |
+| 2026-10-09 | The ledger adds one line for each finished attempt; the last line of an issue is its record | The file is append-only, so a stop cannot damage it, and a resume finds the attempt count |
+| 2026-10-09 | A resumed issue starts its attempt again from the build | It is simple and correct. A stopped attempt left no ledger line |
+| 2026-10-09 | `trust-suite/run.sh` uses `scripts/verify.sh` | The scorecard measures the same verifier step that runs on real PRs |
 
 ## Open questions
 
@@ -417,4 +454,3 @@ These are first targets. Change them after Phase 5.
 - How do we install the workflow: as a Claude Code plugin, or as files copied into the target repo?
 - Where do we publish the ledger: in the repo, or only in the README?
 - Does the builder use a test-driven development skill when one is installed?
-- How does the verifier result reach GitHub: a second commit status context, or one combined status from the decision step?

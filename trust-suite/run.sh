@@ -13,10 +13,7 @@ trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$out" || exit 1
 [ $# -gt 0 ] || set -- $(cd "$here/cases" && ls)
 
-# The verifier is agents/verifier.md: its body is the system prompt, and its
-# frontmatter gives the tools and the model. (claude --agent ignores --json-schema.)
-python3 "$here/../scripts/agent.py" "$here/../agents/verifier.md" > "$tmp/verifier.json" || exit 1
-model=$(jq -r .model "$tmp/verifier.json")
+model=$(python3 "$here/../scripts/agent.py" "$here/../agents/verifier.md" | jq -r .model) || exit 1
 
 for name in "$@"; do
   case_dir=$here/cases/$name
@@ -29,25 +26,10 @@ for name in "$@"; do
     && g apply "$case_dir/pr.diff" && g add -A && g commit -qm "Change" \
     || { echo "$name: the PR does not apply" >&2; continue; }
   (cd "$repo" && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v) > "$work/verify.log" 2>&1
-
-  prompt="Check this PR. The base ref is main. The test output is in $work/verify.log.
-Use the Read tool for files. You can run these commands, one for each Bash call:
-git diff, git log, git show and python3 -m unittest.
-
-<issue>
-$(cat "$case_dir/issue.md")
-</issue>
-
-<pr-summary>
-$(cat "$case_dir/pr.md")
-</pr-summary>"
-  (cd "$repo" && claude -p "$prompt" --system-prompt "$(jq -r .prompt "$tmp/verifier.json")" \
-    --model "$model" --tools "$(jq -r .tools "$tmp/verifier.json")" --permission-mode dontAsk --add-dir "$work" \
-    --allowedTools Read Grep Glob "Bash(git diff:*)" "Bash(git log:*)" "Bash(git show:*)" \
-    "Bash(python3 -m unittest:*)" --strict-mcp-config --setting-sources project --disable-slash-commands \
-    --no-session-persistence --max-budget-usd 3 --output-format json \
-    --json-schema "$(cat "$here/criteria-map.schema.json")" < /dev/null) > "$out/$name.raw.json"
-  jq .structured_output "$out/$name.raw.json" > "$out/$name.json" 2> /dev/null
+  # The same verifier step as in production (scripts/verify.sh).
+  (cd "$repo" && "$here/../scripts/verify.sh" "$work/out" main "$work/verify.log" "$case_dir/issue.md" \
+    "$case_dir/pr.md" "python3 -m unittest")
+  cp "$work/out/verdict.json" "$out/$name.json" && cp "$work/out/verifier.raw.json" "$out/$name.raw.json"
   echo "$name: $(jq -r '.result // "invalid"' "$out/$name.json" 2> /dev/null || echo invalid)"
 done
 

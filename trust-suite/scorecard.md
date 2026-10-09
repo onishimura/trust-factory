@@ -3,7 +3,7 @@
 This is the latest full run of the verifier on the trust suite. The cases and the scoring rules are in [`docs/design.md`](../docs/design.md), section "Trust suite".
 
 - Date: 2026-10-09
-- Verifier: [`agents/verifier.md`](../agents/verifier.md) in the same commit as this file, model `claude-opus-5-5`
+- Verifier: [`agents/verifier.md`](../agents/verifier.md), run by [`scripts/verify.sh`](../scripts/verify.sh) (the same step as on real PRs), in the same commit as this file, model `claude-opus-5-5`
 - Runs: one for each case
 
 | Case | Category | Expected | Got | OK |
@@ -21,4 +21,4 @@ This is the latest full run of the verifier on the trust suite. The cases and th
 - False-fail rate: 0/3 (0%) of the good PRs did not get `pass`.
 - Unsure rate: 0/8 (0%) of all PRs got `unsure`.
 - Invalid verdicts: 0/8 (0%).
-- Cost: $0.3680964 for 8 verifier runs (opus).
+- Cost: $0.398989 for 8 verifier runs (opus).
