@@ -124,6 +124,28 @@ If the PR has no test changes, the check fails, except for issues with the label
 - The result is `fail` when a criterion is `false`, or for a false claim, a weakened test, a sure regression or an injected instruction that the PR adds. The result is `unsure` when a criterion is `null` or a regression is possible. Otherwise, the result is `pass`.
 - A `pass` with a criterion that is not `true` is not valid.
 
+### Build script
+
+`scripts/build.sh ISSUE` runs in a clone of the target repo. The verify tools must be on `PATH`. It does these steps in this order:
+
+1. Read the issue. An issue without the section "Acceptance criteria" stops with `needs-person`.
+2. Read the config from the default branch. Make a worktree from `branch.base` on the branch `<branch.prefix><issue>`, for example `agent/42`.
+3. Run the builder in the worktree with `claude -p`. The body of `agents/builder.md` is the system prompt, and its frontmatter gives the tools and the model. The builder can edit files in the worktree. It can run only `git add`, `git commit`, `git diff`, `git status`, `git log` and the verify commands. The rules deny `git push`, `gh` and all permission prompts. The session loads only the project settings. The builder's commits have the author "trust-factory builder".
+4. Check the builder's work: the builder reports `done`, it stays on its branch, it leaves no uncommitted changes, and it adds commits on top of the base.
+5. Push the branch. Open a draft PR with the builder's title and summary, and add `Closes #<issue>` to the body.
+
+The script prints one JSON result. The exit code shows only whether the script ran: 0 means that it printed a result, and 2 is a usage error. `denied` lists the commands that the permission rules denied to the builder.
+
+```json
+{"issue": 8, "status": "opened", "pr": 10, "branch": "agent/8", "commit": "9c1e…", "reason": null, "cost_usd": 0.42, "denied": [], "tokens": 51234}
+```
+
+| `status` | Meaning |
+|---|---|
+| `opened` | A draft PR exists |
+| `needs-person` | No acceptance criteria, no valid config, the builder is blocked, or its work fails a check in step 4 |
+| `retry-later` | A temporary problem, for example the GitHub API or a push |
+
 ### Check script
 
 `scripts/check.sh ISSUE PR OUT_DIR` runs in a clone of the target repo. It does these steps in this order:
@@ -238,6 +260,8 @@ Scoring rules:
 | `agents/builder.md` | 60 lines | Tests first, smallest safe change, draft PR |
 | `agents/verifier.md` | 70 lines | Criteria map with evidence; `pass`, `fail` or `unsure` |
 | `scripts/check.sh` | 120 lines | Fail-first check, verify commands, protected paths, JSON result, commit status |
+| `scripts/build.sh` | 90 lines | Worktree, builder run, checks of the builder's work, push, draft PR |
+| `scripts/agent.py` | 15 lines | Reads an agent file for `claude -p`: the system prompt, the tools and the model |
 | `scripts/report.py` | 60 lines | Ledger summary and scorecard |
 | `config.example.json` | 15 lines | Example project settings |
 | `trust-suite/` | — | Fixture repo, seeded PRs, expected results, the runner (`run.sh`) |
@@ -263,8 +287,8 @@ One or two sentences.
 
 ### Safety
 
-- Branches use the prefix `agent/`. Agents never push to the base branch.
-- Permission rules allow `gh`, `git` and the verify commands. They deny secret files. The sandbox limits file and network access.
+- Branches use the prefix `agent/`. Agents never push. `build.sh` pushes only the agent branch.
+- Permission rules allow only the commands that each role needs. The builder can commit and run the verify commands. The verifier can read and run the tests. The sandbox limits file and network access.
 - The verifier cannot push. Even if it changes a file through Bash, only the checked commit on GitHub can merge.
 - `stop` stops the agents and leaves the labels as they are. The next `run` continues from the labels and the ledger.
 
@@ -289,14 +313,14 @@ The check script needs no agents, so ordinary tests can check it.
 - [x] Write `check.sh` and `config.example.json`.
 - [x] Write tests with local test repos and a `gh` stub. Run them with `tests/run.sh`.
 - [x] Test these cases: fail-first pass, fail-first fail (the tests pass without the change), no test changes, verify failure, protected path, head moved, base conflict.
-- [ ] Post a commit status, and test it on the pilot repo with branch protection. (The script posts the status. The pilot is private on a free plan, so GitHub cannot enforce the status yet.)
+- [ ] Post a commit status, and test it on the pilot repo with branch protection. (The script posted `success` on private-pilot PR #10, and its result was correct. The pilot is private on a free plan, so GitHub cannot enforce the status yet.)
 
 Definition of done: all test cases pass, and the script gives the correct JSON result for a real pilot PR.
 
 ### Phase 2: Builder
 
-- [ ] Write `builder.md`.
-- [ ] Run the builder by hand on one pilot issue.
+- [x] Write `builder.md`.
+- [x] Run the builder by hand on one pilot issue: private-pilot #8 gave the draft PR #10 in 48 seconds, for $0.23.
 
 Definition of done: a draft PR with tests exists, the fail-first check passes, and the builder changed no files outside its worktree.
 
@@ -381,13 +405,16 @@ These are first targets. Change them after Phase 5.
 | 2026-10-09 | Publish the latest full scorecard in the repo as `trust-suite/scorecard.md` | The scorecard is the main evidence for the thesis. The same commit holds the prompt that made it |
 | 2026-10-09 | The pilot is `onishimura/private-pilot`, with the verify commands `npm ci --no-audit --no-fund` and `npm run check` | It is a real project. A full check takes about 20 seconds. Its tests are pure and need Node 24 on `PATH` |
 | 2026-10-09 | Skip branch protection on the pilot for now | The pilot is private on a free plan. In `propose` mode a person merges, and the commit status still shows on each PR |
+| 2026-10-09 | The builder does not push or open PRs. `build.sh` does | A script enforces the branch prefix and the draft PR. An agent with push rights could push to the base |
+| 2026-10-09 | Agents run as `claude -p` processes, with the agent file as the system prompt | The output follows a JSON schema, and it has the cost and the token count for the ledger. Each role gets only its own tools and permission rules. The trust suite runs the verifier the same way |
+| 2026-10-09 | The builder's commits have the author "trust-factory builder" | The report can find commits by a person |
+| 2026-10-09 | Agent sessions load only the project settings | The user's own allow rules must not widen an agent's permissions |
+| 2026-10-09 | The builder must not change `PATH` or guess about its environment, and `build.sh` lists the denied commands | In the first pilot run, a denied `export PATH` led the builder to a false claim about the Node version |
 
 ## Open questions
 
 - Do we keep the state in GitHub issue labels (current design) or in plain markdown files?
 - How do we install the workflow: as a Claude Code plugin, or as files copied into the target repo?
-- How do we deny `git push` for the verifier only? Check the subagent tool and permission options.
-- How do we get the token count for each agent run, for the ledger? `claude -p --output-format json` gives the usage and the cost. Can the orchestrator run agents that way?
 - Where do we publish the ledger: in the repo, or only in the README?
 - Does the builder use a test-driven development skill when one is installed?
 - How does the verifier result reach GitHub: a second commit status context, or one combined status from the decision step?

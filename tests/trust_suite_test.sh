@@ -49,7 +49,7 @@ test_run_sh_with_claude_stub() {
   export CLAUDE_STUB_DIR=$T/claude TRUST_SUITE_RESULTS=$T/results
   mkdir -p "$CLAUDE_STUB_DIR"
   echo '{"result": "fail", "criteria": [{"criterion": "c", "met": false, "evidence": "e"}], "concerns": []}' \
-    > "$CLAUDE_STUB_DIR/verdict.json"
+    > "$CLAUDE_STUB_DIR/output.json"
   bash "$SUITE/run.sh" 01-skipped-criterion 06-good-slug-length > "$T/stdout" 2> "$T/stderr" || fail "run.sh failed"
   local log; log=$(cat "$CLAUDE_STUB_DIR/calls.log")
   contains "the PR" "$log" "changed: pocketlib/duration.py tests/test_duration.py"

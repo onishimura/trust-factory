@@ -4,7 +4,7 @@
 
 TESTS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 CHECK=$TESTS_DIR/../scripts/check.sh
-root=$(mktemp -d "${TMPDIR:-/tmp}/tf-test.XXXXXX")
+root=$(cd "$(mktemp -d "${TMPDIR:-/tmp}/tf-test.XXXXXX")" && pwd)
 trap 'rm -rf "$root"' EXIT
 
 init_test_dir() { # DIR: make $T, and isolate git and the stubs in tests/bin

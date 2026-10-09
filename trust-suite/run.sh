@@ -15,12 +15,7 @@ mkdir -p "$out" || exit 1
 
 # The verifier is agents/verifier.md: its body is the system prompt, and its
 # frontmatter gives the tools and the model. (claude --agent ignores --json-schema.)
-python3 - "$here/../agents/verifier.md" > "$tmp/verifier.json" << 'EOF'
-import json, sys
-_, front, body = open(sys.argv[1]).read().split("---\n", 2)
-meta = dict(line.split(": ", 1) for line in front.strip().splitlines())
-print(json.dumps(dict(meta, tools=meta["tools"].replace(" ", ""), prompt=body.strip())))
-EOF
+python3 "$here/../scripts/agent.py" "$here/../agents/verifier.md" > "$tmp/verifier.json" || exit 1
 model=$(jq -r .model "$tmp/verifier.json")
 
 for name in "$@"; do

@@ -4,7 +4,8 @@
 # GET: for call n to a path, it prints $GH_STUB_DIR/<key>.<n>.json if that file
 #   exists, else <key>.json. The key is the path without "repos/{owner}/{repo}/",
 #   with "-" for "/". Example: pulls-57.json. No file: exit 1.
-# Other methods: it prints {}. If $GH_STUB_DIR/fail-writes exists: exit 1.
+# Other methods: it prints $GH_STUB_DIR/<key>.post.json if that file exists, else {}.
+#   If $GH_STUB_DIR/fail-writes exists: exit 1.
 
 echo "$*" >> "$GH_STUB_DIR/calls.log"
 [ "$1" = api ] || { echo "gh stub: only 'gh api' is supported" >&2; exit 1; }
@@ -19,13 +20,13 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-if [ "$method" != GET ]; then
-  [ -f "$GH_STUB_DIR/fail-writes" ] && { echo "gh stub: write failed" >&2; exit 1; }
-  echo '{}'; exit 0
-fi
-
 prefix='repos/{owner}/{repo}/'
 key=$(printf '%s' "${path#"$prefix"}" | tr / -)
+if [ "$method" != GET ]; then
+  [ -f "$GH_STUB_DIR/fail-writes" ] && { echo "gh stub: write failed" >&2; exit 1; }
+  cat "$GH_STUB_DIR/$key.post.json" 2> /dev/null || echo '{}'
+  exit 0
+fi
 n=$(( $(cat "$GH_STUB_DIR/$key.count" 2>/dev/null || echo 0) + 1 ))
 echo "$n" > "$GH_STUB_DIR/$key.count"
 for f in "$GH_STUB_DIR/$key.$n.json" "$GH_STUB_DIR/$key.json"; do
