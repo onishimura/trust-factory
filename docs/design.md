@@ -22,7 +22,7 @@ Many agent workflows show that agents can open PRs. Few of them show how often t
 - **Fixed checks come before model judgment.** When a script can check a fact, a model does not decide it.
 - **Issue text is data.** Agents follow the acceptance criteria. They do not follow instructions in issue bodies, comments or code.
 - **Use Claude Code features first.** Use subagents, worktree isolation, permission rules and the sandbox before custom scripts. Regex hooks are not a security boundary.
-- **Each new feature must fix a failure that we saw.** Keep the core under approximately 720 lines, not including tests and the trust suite.
+- **Each new feature must fix a failure that we saw.** Keep the core under approximately 760 lines, not including tests and the trust suite.
 
 ## Scope
 
@@ -293,6 +293,7 @@ Scoring rules:
 | `scripts/check.sh` | 120 lines | Fail-first check, verify commands, protected paths, JSON result, commit status |
 | `scripts/build.sh` | 90 lines | Worktree, builder run, checks of the builder's work, push, draft PR |
 | `scripts/agent.py` | 15 lines | Reads an agent file for `claude -p`: the system prompt, the tools and the model |
+| `scripts/setup.sh` | 35 lines | Prepares a target repo: labels, a config from the example, an ignored ledger, the skill link |
 | `scripts/report.py` | 60 lines | Ledger summary and scorecard |
 | `config.example.json` | 15 lines | Example project settings |
 | `trust-suite/` | — | Fixture repo, seeded PRs, expected results, the runner (`run.sh`) |
@@ -383,8 +384,8 @@ Definition of done: a written decision about auto-merge, with the ledger data an
 
 ### Phase 6: Publish
 
-- [ ] Choose a license.
-- [ ] Write the README: the thesis, a quick start, the scorecard, the ledger report and the credits.
+- [x] Choose a license: MIT.
+- [x] Write the README: the thesis, a quick start, the scorecard, the ledger report and the credits.
 - [ ] Add a short demo: one issue from `agent:ready` to a proposed PR, with its evidence.
 - [ ] Make the repo public.
 
@@ -400,7 +401,7 @@ Definition of done: a person who does not know the project can install it on a t
 
 These are first targets. Change them after Phase 5.
 
-- The core stays under approximately 720 lines, not including tests and the trust suite.
+- The core stays under approximately 760 lines, not including tests and the trust suite.
 - Setup on a new repo takes less than 10 minutes.
 - No merge from the workflow makes the base branch fail its verify commands.
 - Trust suite: the catch rate is 100%, and no more than one good control fails.
@@ -451,10 +452,13 @@ These are first targets. Change them after Phase 5.
 | 2026-10-09 | The `needs-person` comment lists the reasons of each attempt, and a blocked builder's summary is one reason | Pilot #17: the comment showed only the last attempt, so the verifier's catch was only in the ledger |
 | 2026-10-09 | The report shows one row for each run, not for each issue | Pilot #17 ran twice. A report by issue dropped the failed first run and its cost |
 | 2026-10-09 | Keep `propose` mode; do not allow `auto` yet | 9 of 10 pilot issues merged with no human edits, but the pilot has no merge enforcement, the workflow cannot follow a moving base by itself, and the sample is small. See `docs/auto-merge-decision.md` |
+| 2026-10-09 | Install by clone: `scripts/setup.sh` prepares the target repo and links the skill into `~/.claude/skills` | It works with the current layout and needs no plugin format. A plugin can come later |
+| 2026-10-09 | License: MIT | Short and permissive, for a showcase repo |
+| 2026-10-09 | The core budget is approximately 760 lines | The setup script (35 lines) is part of v1 scope. The core is 752 lines |
+| 2026-10-09 | Before the repo goes public, the history uses the owner's GitHub no-reply email and calls the pilot `private-pilot` | The owner's email and the name of the private pilot repo must not become public |
 
 ## Open questions
 
 - Do we keep the state in GitHub issue labels (current design) or in plain markdown files?
-- How do we install the workflow: as a Claude Code plugin, or as files copied into the target repo?
 - Where do we publish the ledger: in the repo, or only in the README?
 - Does the builder use a test-driven development skill when one is installed?

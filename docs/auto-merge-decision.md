@@ -90,7 +90,7 @@ Even then, `auto` applies only to a PR that has a diff of at most `merge.auto_wh
 
 | Criterion (`docs/design.md`) | Result |
 |---|---|
-| The core stays under approximately 720 lines | 713 lines |
+| The core stays under approximately 760 lines | 713 lines at the decision, 752 with the Phase 6 setup script |
 | No merge from the workflow makes the base branch fail its verify commands | True for all 9 merges |
 | Trust suite: the catch rate is 100%, and no more than one good control fails | 5/5 and 0/3, in two runs |
 | At least 6 of 10 pilot issues finish with no human code changes | 9 of 10 |

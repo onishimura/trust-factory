@@ -6,7 +6,8 @@
 # GET: run <key>.sh if it exists. Else print <key>.<n>.json for call n if that
 #   file exists, else <key>.json. No file: exit 1.
 # Other methods: if $GH_STUB_DIR/fail-writes exists, exit 1. Else run
-#   <key>.write.sh with the arguments, or print <key>.write.json, or print {}.
+#   <key>.write.sh with the arguments (its exit code is the reply), or print
+#   <key>.write.json, or print {}.
 # A body from stdin (--input - or -F body=@-) goes to <key>.input (the last
 # one) and is added to <key>.inputs.
 
@@ -33,8 +34,8 @@ dir=$GH_STUB_DIR
 if [ -n "$stdin" ]; then body=$(cat); printf '%s\n' "$body" > "$dir/$key.input"; printf '%s\n' "$body" >> "$dir/$key.inputs"; fi
 if [ "$method" != GET ]; then
   [ -f "$dir/fail-writes" ] && { echo "gh stub: write failed" >&2; exit 1; }
-  if [ -f "$dir/$key.write.sh" ]; then bash "$dir/$key.write.sh" "${args[@]}"
-  else cat "$dir/$key.write.json" 2> /dev/null || echo '{}'; fi
+  [ -f "$dir/$key.write.sh" ] && exec bash "$dir/$key.write.sh" "${args[@]}"
+  cat "$dir/$key.write.json" 2> /dev/null || echo '{}'
   exit 0
 fi
 
