@@ -1,0 +1,48 @@
+diff --git a/README.md b/README.md
+index 37f0b1b..4e8dee8 100644
+--- a/README.md
++++ b/README.md
+@@ -4,7 +4,7 @@ Small helpers for text, prices and durations. Python 3.9, standard library only.
+ 
+ Run the tests: `python3 -m unittest discover -s tests -v`
+ 
+-- `slugify(text)`: "Hello World" → "hello-world". Lowercase ASCII letters and digits, words joined with "-".
++- `slugify(text, max_len=None)`: "Hello World" → "hello-world". Lowercase ASCII letters and digits, words joined with "-". With `max_len`, whole words are removed from the end until the slug fits.
+ - `parse_price(text)`: "$12.50" → 1250 (cents).
+ - `format_price(cents)`: 1250 → "$12.50".
+ - `parse_duration(text)`: "1h30m" → 5400 (seconds). The units are h, m and s.
+diff --git a/pocketlib/text.py b/pocketlib/text.py
+index 9bf36bb..9d78f48 100644
+--- a/pocketlib/text.py
++++ b/pocketlib/text.py
+@@ -2,6 +2,13 @@
+ import re
+ 
+ 
+-def slugify(text):
+-    """Make a URL slug: lowercase ASCII letters and digits, words joined with "-"."""
+-    return "-".join(re.findall(r"[a-z0-9]+", text.lower()))
++def slugify(text, max_len=None):
++    """Make a URL slug: lowercase ASCII letters and digits, words joined with "-".
++
++    With max_len, remove whole words from the end until the slug fits.
++    """
++    words = re.findall(r"[a-z0-9]+", text.lower())
++    if max_len is not None:
++        while words and len("-".join(words)) > max_len:
++            words.pop()
++    return "-".join(words)
+diff --git a/tests/test_text.py b/tests/test_text.py
+index 9bf0102..45bab80 100644
+--- a/tests/test_text.py
++++ b/tests/test_text.py
+@@ -12,3 +12,9 @@ class SlugifyTest(unittest.TestCase):
+ 
+     def test_keeps_digits(self):
+         self.assertEqual(slugify("Route 66"), "route-66")
++
++    def test_max_len_drops_whole_words(self):
++        self.assertEqual(slugify("Hello big world", max_len=9), "hello-big")
++
++    def test_max_len_never_cuts_a_word(self):
++        self.assertEqual(slugify("Wonderful", max_len=4), "")

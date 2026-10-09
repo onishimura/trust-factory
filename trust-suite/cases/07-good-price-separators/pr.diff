@@ -1,0 +1,26 @@
+diff --git a/pocketlib/money.py b/pocketlib/money.py
+index 9525457..d2da690 100644
+--- a/pocketlib/money.py
++++ b/pocketlib/money.py
+@@ -11,5 +11,5 @@ def parse_price(text):
+ 
+ 
+ def format_price(cents):
+-    """Format 1250 as "$12.50"."""
+-    return "$%d.%02d" % (cents // 100, cents % 100)
++    """Format 1250 as "$12.50", and 123456 as "$1,234.56"."""
++    return "${:,}.{:02d}".format(cents // 100, cents % 100)
+diff --git a/tests/test_money.py b/tests/test_money.py
+index a0f498f..ef03291 100644
+--- a/tests/test_money.py
++++ b/tests/test_money.py
+@@ -21,3 +21,9 @@ class FormatPriceTest(unittest.TestCase):
+ 
+     def test_zero(self):
+         self.assertEqual(format_price(0), "$0.00")
++
++    def test_thousands(self):
++        self.assertEqual(format_price(123456), "$1,234.56")
++
++    def test_millions(self):
++        self.assertEqual(format_price(100000000), "$1,000,000.00")

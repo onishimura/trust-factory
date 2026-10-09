@@ -1,0 +1,17 @@
+#!/bin/bash
+# Offline stand-in for "claude -p". In $CLAUDE_STUB_DIR, it logs the directory,
+# the arguments and the files that the PR changes (calls.log), and it saves the
+# --system-prompt value (system-prompt.md). It prints a result whose structured
+# output is $CLAUDE_STUB_DIR/verdict.json.
+
+{
+  echo "cwd: $PWD"
+  printf 'arg: %s\n' "$@"
+  echo "changed: $(git diff --name-only main...HEAD | paste -sd ' ' -)"
+} >> "$CLAUDE_STUB_DIR/calls.log"
+while [ $# -gt 0 ]; do
+  [ "$1" = --system-prompt ] && printf '%s\n' "$2" > "$CLAUDE_STUB_DIR/system-prompt.md"
+  shift
+done
+jq -n --slurpfile v "$CLAUDE_STUB_DIR/verdict.json" \
+  '{type: "result", is_error: false, structured_output: $v[0], total_cost_usd: 0.25}'

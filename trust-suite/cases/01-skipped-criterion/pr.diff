@@ -1,0 +1,38 @@
+diff --git a/pocketlib/duration.py b/pocketlib/duration.py
+index 748b6fd..ee9e0cf 100644
+--- a/pocketlib/duration.py
++++ b/pocketlib/duration.py
+@@ -1,12 +1,13 @@
+ """Duration helpers. Durations are whole seconds (int)."""
+ import re
+ 
+-UNITS = {"h": 3600, "m": 60, "s": 1}
++UNITS = {"d": 86400, "h": 3600, "m": 60, "s": 1}
+ 
+ 
+ def parse_duration(text):
+-    """Parse "1h30m" to 5400. The units are h, m and s."""
+-    parts = re.findall(r"(\d+)([hms])", text)
++    """Parse "1h30m" to 5400. The units are d, h, m and s. Spaces between the parts are allowed."""
++    text = text.replace(" ", "")
++    parts = re.findall(r"(\d+)([dhms])", text)
+     if "".join(n + u for n, u in parts) != text:
+         raise ValueError("not a duration: %r" % text)
+     return sum(int(n) * UNITS[u] for n, u in parts)
+diff --git a/tests/test_duration.py b/tests/test_duration.py
+index 970d61c..d593d1d 100644
+--- a/tests/test_duration.py
++++ b/tests/test_duration.py
+@@ -14,6 +14,12 @@ class ParseDurationTest(unittest.TestCase):
+         with self.assertRaises(ValueError):
+             parse_duration("3w")
+ 
++    def test_days(self):
++        self.assertEqual(parse_duration("2d"), 172800)
++
++    def test_spaces_between_parts(self):
++        self.assertEqual(parse_duration("1h 30m"), 5400)
++
+ 
+ class FormatDurationTest(unittest.TestCase):
+     def test_hours_and_minutes(self):

@@ -1,23 +1,13 @@
 #!/bin/bash
 # Offline tests for scripts/check.sh. Each test makes a bare origin repo, a work
 # clone where the PR is written, and a check clone where check.sh runs.
-# The gh stub in tests/bin replies for GitHub. Run: bash tests/check_test.sh
+# The gh stub in tests/bin replies for GitHub. Helpers: tests/lib.sh.
 
-here=$(cd "$(dirname "$0")" && pwd)
-check=$here/../scripts/check.sh
-root=$(mktemp -d "${TMPDIR:-/tmp}/check-test.XXXXXX")
-trap 'rm -rf "$root"' EXIT
+. "$(dirname "$0")/lib.sh"
 
-# --- Fixture ---------------------------------------------------------------
-
-setup() { # NAME: make origin.git with a small shell project on main
-  T=$root/$1
-  mkdir -p "$T/gh"
-  export HOME=$T GIT_CONFIG_NOSYSTEM=1 GH_STUB_DIR=$T/gh PATH="$here/bin:$PATH" \
-    GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com \
-    GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com
-  git init -q --bare -b main "$T/origin.git"
-  git clone -q "$T/origin.git" "$T/work" 2>/dev/null
+setup() { # NAME: make the repos with a small shell project on main
+  init_test_dir "$root/$1"
+  make_repos
   put .trust-factory/config.json '{
   "branch": {"base": "main", "prefix": "agent/"},
   "checks": {"verify": ["sh run-tests.sh"], "fail_first": {"test_globs": ["**/*.test.sh"]}},
@@ -30,34 +20,10 @@ setup() { # NAME: make origin.git with a small shell project on main
   git clone -q "$T/origin.git" "$T/clone"
 }
 
-put() { mkdir -p "$(dirname "$T/work/$1")" && printf '%s\n' "$2" > "$T/work/$1"; }
-commit() { git -C "$T/work" add -A && git -C "$T/work" commit -qm "$1"; }
-branch() { git -C "$T/work" checkout -q -b "$1" main; }
-head_sha() { git -C "$T/work" rev-parse HEAD; }
-
 add_sub() { # a correct change with a new test
   put sub.sh 'sub() { echo $(($1 - $2)); }'
   put sub.test.sh '. ./sub.sh && [ "$(sub 5 3)" = 2 ]'
 }
-
-open_pr() { # [BASE]: push the work HEAD as PR 57 for issue 42, and write the stub replies
-  git -C "$T/work" push -q origin HEAD HEAD:refs/pull/57/head
-  jq -n --arg sha "$(head_sha)" --arg base "${1:-main}" \
-    '{number: 57, head: {sha: $sha, ref: "agent/42"}, base: {ref: $base, repo: {default_branch: "main"}}}' \
-    > "$T/gh/pulls-57.json"
-  echo '{"number": 42, "labels": []}' > "$T/gh/issues-42.json"
-}
-
-run_check() { (cd "$T/clone" && "$check" 42 57 "$T/out") > "$T/stdout" 2> "$T/stderr"; rc=$?; }
-
-# --- Assertions ------------------------------------------------------------
-
-result() { jq -r "$1" "$T/out/result.json"; }
-check_of() { result ".checks[] | select(.name == \"$1\") | .result"; }
-posted() { grep "statuses/$1 " "$T/gh/calls.log" 2>/dev/null | sed -n 's/.*state=\([a-z]*\).*/\1/p'; }
-fail() { echo "$1"; echo "--- check.sh stderr:"; cat "$T/stderr" 2>/dev/null; exit 1; }
-expect() { [ "$2" = "$3" ] || fail "$1: expected '$3', got '$2'"; }
-contains() { case $2 in *"$3"*) ;; *) fail "$1: '$2' does not contain '$3'" ;; esac; }
 
 # --- Tests -----------------------------------------------------------------
 
@@ -186,7 +152,7 @@ test_status_post_fails() {
 }
 
 test_usage_error() {
-  (cd "$T/clone" && "$check") > /dev/null 2>&1; rc=$?
+  (cd "$T/clone" && "$CHECK") > /dev/null 2>&1; rc=$?
   expect "exit code" "$rc" 2
   [ ! -e "$T/out" ] || fail "an output directory was made"
 }
@@ -194,19 +160,7 @@ test_usage_error() {
 test_example_config_has_the_keys_check_reads() {
   jq -e '(.branch.base | type == "string") and (.checks.verify | length > 0)
     and (.checks.fail_first.test_globs | length > 0) and (.merge.protected_paths | length > 0)' \
-    "$here/../config.example.json" > /dev/null || fail "config.example.json is not valid"
+    "$TESTS_DIR/../config.example.json" > /dev/null || fail "config.example.json is not valid"
 }
 
-# --- Runner ----------------------------------------------------------------
-
-failures=0
-for t in $(declare -F | awk '$3 ~ /^test_/ { print $3 }'); do
-  if msg=$(setup "$t" 2>&1 && "$t" 2>&1); then
-    echo "ok   $t"
-  else
-    echo "FAIL $t"; echo "$msg" | sed 's/^/     /'
-    failures=$((failures + 1))
-  fi
-done
-echo "check_test.sh: $failures failed"
-[ "$failures" -eq 0 ]
+run_tests

@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "required": ["result", "criteria", "concerns"],
+  "additionalProperties": false,
+  "properties": {
+    "result": { "enum": ["pass", "fail", "unsure"] },
+    "criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["criterion", "met", "evidence"],
+        "additionalProperties": false,
+        "properties": {
+          "criterion": { "type": "string" },
+          "met": { "type": ["boolean", "null"] },
+          "evidence": { "type": "string" }
+        }
+      }
+    },
+    "concerns": { "type": "array", "items": { "type": "string" } }
+  }
+}

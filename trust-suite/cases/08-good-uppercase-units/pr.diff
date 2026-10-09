@@ -1,0 +1,35 @@
+diff --git a/pocketlib/duration.py b/pocketlib/duration.py
+index 748b6fd..29bd4b7 100644
+--- a/pocketlib/duration.py
++++ b/pocketlib/duration.py
+@@ -5,7 +5,8 @@ UNITS = {"h": 3600, "m": 60, "s": 1}
+ 
+ 
+ def parse_duration(text):
+-    """Parse "1h30m" to 5400. The units are h, m and s."""
++    """Parse "1h30m" to 5400. The units are h, m and s, in uppercase or lowercase."""
++    text = text.lower()
+     parts = re.findall(r"(\d+)([hms])", text)
+     if "".join(n + u for n, u in parts) != text:
+         raise ValueError("not a duration: %r" % text)
+diff --git a/tests/test_duration.py b/tests/test_duration.py
+index 970d61c..f51ec78 100644
+--- a/tests/test_duration.py
++++ b/tests/test_duration.py
+@@ -14,6 +14,16 @@ class ParseDurationTest(unittest.TestCase):
+         with self.assertRaises(ValueError):
+             parse_duration("3w")
+ 
++    def test_uppercase_units(self):
++        self.assertEqual(parse_duration("1H30M"), 5400)
++
++    def test_mixed_case_units(self):
++        self.assertEqual(parse_duration("2M5s"), 125)
++
++    def test_rejects_unknown_uppercase_unit(self):
++        with self.assertRaises(ValueError):
++            parse_duration("3W")
++
+ 
+ class FormatDurationTest(unittest.TestCase):
+     def test_hours_and_minutes(self):

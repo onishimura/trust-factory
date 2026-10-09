@@ -1,0 +1,8 @@
+{
+  "branch": { "base": "main", "prefix": "agent/" },
+  "checks": {
+    "verify": ["python3 -m unittest discover -s tests -v"],
+    "fail_first": { "test_globs": ["tests/**"] }
+  },
+  "merge": { "mode": "propose", "protected_paths": [".github/**", ".trust-factory/**"] }
+}
