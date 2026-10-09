@@ -375,9 +375,9 @@ Definition of done: three pilot issues go from `agent:ready` to a result in `pro
 
 ### Phase 5: Measure
 
-- [ ] Run ten pilot issues.
-- [ ] Run `report`: pass rate, attempts, human edits, time and tokens.
-- [ ] Decide from the data whether to allow `auto` mode for small changes.
+- [x] Run ten pilot issues: private-pilot #6 to #9 and #14 to #19, in 16 runs.
+- [x] Run `report`: pass rate, attempts, human edits, time and tokens.
+- [x] Decide from the data whether to allow `auto` mode for small changes: no, not yet. See [`docs/auto-merge-decision.md`](auto-merge-decision.md).
 
 Definition of done: a written decision about auto-merge, with the ledger data and the scorecard.
 
@@ -450,6 +450,7 @@ These are first targets. Change them after Phase 5.
 | 2026-10-09 | Fail-first is skipped for `type:docs` and `type:chore`, also when the PR changes tests | Pilot #17: removed tests "passed without the change". With that feedback, the builder added a test only to make the base fail. The verifier caught it |
 | 2026-10-09 | The `needs-person` comment lists the reasons of each attempt, and a blocked builder's summary is one reason | Pilot #17: the comment showed only the last attempt, so the verifier's catch was only in the ledger |
 | 2026-10-09 | The report shows one row for each run, not for each issue | Pilot #17 ran twice. A report by issue dropped the failed first run and its cost |
+| 2026-10-09 | Keep `propose` mode; do not allow `auto` yet | 9 of 10 pilot issues merged with no human edits, but the pilot has no merge enforcement, the workflow cannot follow a moving base by itself, and the sample is small. See `docs/auto-merge-decision.md` |
 
 ## Open questions
 

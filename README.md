@@ -2,7 +2,7 @@
 
 **An agent workflow that measures how much you can trust it.**
 
-> **Status:** Phases 0 to 4. The whole workflow runs: `scripts/factory.sh` builds, checks and verifies issues, and it writes a run ledger. On the pilot repo, three issues went from `agent:ready` to a proposed PR. Offline tests check all scripts (`tests/run.sh`). The full design is in [`docs/design.md`](docs/design.md).
+> **Status:** Phases 0 to 5. The whole workflow runs: `scripts/factory.sh` builds, checks and verifies issues, and it writes a run ledger. On the pilot repo, ten issues ran, and nine PRs merged. Offline tests check all scripts (`tests/run.sh`). Next: Phase 6, publish. The full design is in [`docs/design.md`](docs/design.md).
 
 trust-factory is a small Claude Code workflow for GitHub repos. A person marks an issue as ready. A builder agent makes the change in its own worktree and opens a draft PR. Fixed checks run first. Then a verifier agent, which cannot edit code, connects each acceptance criterion to evidence. Every run writes a record, and a seeded test suite measures how well the verifier finds bad PRs.
 
@@ -23,10 +23,12 @@ Many agent workflows show that agents can open PRs. Few of them show how often t
 | 2 | Builder agent | Done |
 | 3 | Verifier agent and trust suite | Done |
 | 4 | Orchestrator and run ledger | Done |
-| 5 | Measure on ten real issues | Not started |
+| 5 | Measure on ten real issues | Done |
 | 6 | Publish | Not started |
 
 The latest trust suite result is in [`trust-suite/scorecard.md`](trust-suite/scorecard.md): the verifier caught 5 of 5 seeded bad PRs and passed 3 of 3 good controls.
+
+On ten real issues in the pilot repo, 9 PRs merged with no human edits, and no merge broke the base branch. The workflow stays in `propose` mode for now; [`docs/auto-merge-decision.md`](docs/auto-merge-decision.md) has the data and the reasons.
 
 ## Inspiration
 
