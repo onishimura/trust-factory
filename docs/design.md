@@ -387,7 +387,8 @@ Definition of done: a written decision about auto-merge, with the ledger data an
 - [x] Choose a license: MIT.
 - [x] Write the README: the thesis, a quick start, the scorecard, the ledger report and the credits. The credits link to [`ACKNOWLEDGMENTS.md`](../ACKNOWLEDGMENTS.md).
 - [x] Add a short demo: one issue from `agent:ready` to a proposed PR, with its evidence. See [`docs/demo.md`](demo.md).
-- [ ] Make the repo public.
+- [x] Make the repo public (2026-10-09).
+- [ ] Ask a person who does not know the project to follow the quick start, and time it. (The scripted run took 2 minutes 36 seconds; see `docs/demo.md`.)
 
 Definition of done: a person who does not know the project can install it on a test repo in less than 10 minutes and see the scorecard.
 

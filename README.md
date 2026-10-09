@@ -4,7 +4,7 @@
 
 trust-factory is a small Claude Code workflow for GitHub repos. A person marks an issue as ready. A builder agent makes the change in its own worktree, and a script opens a draft PR. Fixed checks run first. Then a verifier agent, which cannot edit code, connects each acceptance criterion to evidence. Every run writes a record, and a seeded test suite measures how well the verifier finds bad PRs.
 
-> **Status:** Phase 6 (publish). The whole workflow runs and has offline tests (`tests/run.sh`). The full design is in [`docs/design.md`](docs/design.md).
+> **Status:** public since 2026-10-09. The whole workflow runs and has offline tests (`tests/run.sh`). One Phase 6 check is open: a first-time user times the quick start. The full design is in [`docs/design.md`](docs/design.md).
 
 ## Why
 
@@ -99,7 +99,7 @@ For full merge safety, turn on branch protection for the default branch. Require
 | 3 | Verifier agent and trust suite | Done |
 | 4 | Orchestrator and run ledger | Done |
 | 5 | Measure on ten real issues | Done |
-| 6 | Publish | In progress |
+| 6 | Publish | In progress (first-time user test) |
 
 ## Development
 
