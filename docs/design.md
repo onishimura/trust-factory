@@ -345,7 +345,7 @@ The check script needs no agents, so ordinary tests can check it.
 - [x] Write `check.sh` and `config.example.json`.
 - [x] Write tests with local test repos and a `gh` stub. Run them with `tests/run.sh`.
 - [x] Test these cases: fail-first pass, fail-first fail (the tests pass without the change), no test changes, verify failure, protected path, head moved, base conflict.
-- [ ] Post a commit status, and test it on the pilot repo with branch protection. (The script posted `success` on private-pilot PR #10, and its result was correct. The pilot is private on a free plan, so GitHub cannot enforce the status yet.)
+- [x] Post a commit status, and test it with branch protection. The pilot is private on a free plan, so the test ran on the public demo repo: without both statuses, GitHub blocks the merge (see [`docs/demo.md`](demo.md)).
 
 Definition of done: all test cases pass, and the script gives the correct JSON result for a real pilot PR.
 
@@ -386,7 +386,7 @@ Definition of done: a written decision about auto-merge, with the ledger data an
 
 - [x] Choose a license: MIT.
 - [x] Write the README: the thesis, a quick start, the scorecard, the ledger report and the credits.
-- [ ] Add a short demo: one issue from `agent:ready` to a proposed PR, with its evidence.
+- [x] Add a short demo: one issue from `agent:ready` to a proposed PR, with its evidence. See [`docs/demo.md`](demo.md).
 - [ ] Make the repo public.
 
 Definition of done: a person who does not know the project can install it on a test repo in less than 10 minutes and see the scorecard.
@@ -455,6 +455,8 @@ These are first targets. Change them after Phase 5.
 | 2026-10-09 | Install by clone: `scripts/setup.sh` prepares the target repo and links the skill into `~/.claude/skills` | It works with the current layout and needs no plugin format. A plugin can come later |
 | 2026-10-09 | License: MIT | Short and permissive, for a showcase repo |
 | 2026-10-09 | The core budget is approximately 760 lines | The setup script (35 lines) is part of v1 scope. The core is 752 lines |
+| 2026-10-09 | A public demo repo, `onishimura/trust-factory-demo`, holds the demo and the branch-protection test | The pilot is private on a free plan, so it has no branch protection. The demo shows real output that anyone can open |
+| 2026-10-09 | `build.sh` changes `\n` escapes into line breaks when a summary has no line break | Demo run 1: the PR body showed the characters `\n` |
 | 2026-10-09 | Before the repo goes public, the history uses the owner's GitHub no-reply email and calls the pilot `private-pilot` | The owner's email and the name of the private pilot repo must not become public |
 
 ## Open questions

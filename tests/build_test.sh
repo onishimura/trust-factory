@@ -93,6 +93,18 @@ test_rebuild_gets_feedback_and_updates_the_open_pr() {
   contains feedback "$(log)" $'<feedback>\nverify: \'sh run-tests.sh\' fails\nfalse claim: the README changed\n</feedback>'
 }
 
+test_summary_with_escaped_line_breaks_is_fixed() {
+  echo '{"status": "done", "title": "t", "summary": "## Summary\\n- Added hello.sh.\\n\\n## Tests\\n- ok"}' > "$CLAUDE_STUB_DIR/output.json"
+  run_build
+  contains "PR body" "$(cat "$T/gh/calls.log")" $'body=## Summary\n- Added hello.sh.\n\n## Tests\n- ok\n\nCloses #42'
+}
+
+test_summary_with_line_breaks_is_kept() {
+  echo '{"status": "done", "title": "t", "summary": "## Summary\n- Split on `\\n` now."}' > "$CLAUDE_STUB_DIR/output.json"
+  run_build
+  contains "PR body" "$(cat "$T/gh/calls.log")" $'body=## Summary\n- Split on `\\n` now.'
+}
+
 test_first_attempt_has_no_feedback() {
   run_build
   case $(log) in *"<feedback>"*) fail "the first attempt got feedback" ;; esac

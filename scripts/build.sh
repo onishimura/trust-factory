@@ -72,6 +72,8 @@ schema='{"type": "object", "required": ["status", "title", "summary"], "addition
   --strict-mcp-config --disable-slash-commands --no-session-persistence \
   --max-budget-usd "${BUILD_BUDGET_USD:-5}" --output-format json --json-schema "$schema" < /dev/null) > "$tmp/run.json"
 jq -e .structured_output "$tmp/run.json" > "$tmp/out.json" 2> /dev/null || finish needs-person "the builder gave no result"
+# Some runs give a summary with "\n" escapes and no line breaks. Turn those into line breaks.
+jq '.summary |= (if test("\n") then . else gsub("\\\\n"; "\n") end)' "$tmp/out.json" > "$tmp/o.json" && mv "$tmp/o.json" "$tmp/out.json"
 head=$(git -C "$wt" rev-parse HEAD)
 
 # Check the builder's work before anything leaves this machine.

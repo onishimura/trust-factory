@@ -27,6 +27,8 @@ Many agent workflows show that agents can open PRs. Few of them show how often t
 
 The workflow stays in `propose` mode: a person merges each PR. The decision document says what must change before `auto` mode.
 
+**Demo** ([`docs/demo.md`](docs/demo.md)). One issue in the public repo [`onishimura/trust-factory-demo`](https://github.com/onishimura/trust-factory-demo), from `agent:ready` to a proposed PR with its evidence, in about one minute. The quick start took 2 minutes 36 seconds of machine time, to the proposed PR and the scorecard.
+
 ## How it works
 
 ```text
@@ -92,7 +94,7 @@ For full merge safety, turn on branch protection for the default branch. Require
 | Phase | Goal | Status |
 |---|---|---|
 | 0 | Decisions and pilot setup | Done |
-| 1 | Check script and result format | In progress (branch protection test) |
+| 1 | Check script and result format | Done |
 | 2 | Builder agent | Done |
 | 3 | Verifier agent and trust suite | Done |
 | 4 | Orchestrator and run ledger | Done |

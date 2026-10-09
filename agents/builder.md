@@ -40,10 +40,10 @@ Reply with only this JSON object:
 {
   "status": "done",
   "title": "Search time zones by UTC offset",
-  "summary": "## Summary\n- ...\n\n## Tests\n- ..."
+  "summary": "<the PR body in Markdown>"
 }
 ```
 
 - `status` is `done` or `blocked`.
 - `title` is a short PR title.
-- `summary` is the PR body in Markdown. The section "Summary" lists what the diff changes. The section "Tests" lists the tests that you added and the commands that you ran, with their results. State only facts that the diff and the command output show. For `blocked`, the summary says what stopped you.
+- `summary` is the PR body in Markdown, with real line breaks (not the characters `\n`). The section "Summary" lists what the diff changes. The section "Tests" lists the tests that you added and the commands that you ran, with their results. State only facts that the diff and the command output show. For `blocked`, the summary says what stopped you.
