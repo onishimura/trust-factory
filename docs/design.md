@@ -242,7 +242,7 @@ For `needs-person`, the script adds a comment to the issue with the reasons of e
 
 ### Run ledger
 
-The ledger is `.trust-factory/ledger.jsonl` in the target repo (not committed). Each finished attempt adds one JSON line. Each line holds the totals of the run of that issue so far, so the last line of an issue is its record:
+The ledger is `.trust-factory/ledger.jsonl` in the target repo (not committed). Each finished attempt adds one JSON line. A run is one issue from `agent:ready` to a final status. Each line holds the totals of its run so far, so the last line of a run is its record:
 
 ```json
 {"issue": 42, "started": "2026-10-20T10:02:00Z", "finished": "2026-10-20T10:19:00Z", "attempts": 2, "tokens": 183000, "cost_usd": 1.12, "checks": ["proposed", "proposed"], "verdicts": ["fail", "pass"], "reasons": [], "status": "proposed", "pr": 57}
@@ -250,7 +250,7 @@ The ledger is `.trust-factory/ledger.jsonl` in the target repo (not committed). 
 
 After a `rebuild` line, the next attempt continues the same record. After a final status (`proposed` or `needs-person`), a new `agent:ready` starts a new record. A stopped attempt writes no line, so the next run starts that attempt again. The tokens of a stopped attempt are not recorded.
 
-`report.py ledger` reads the last record of each issue. For each merged PR, it sets the status `merged` and fills in `human_edits`: true when a commit has an author other than "trust-factory builder".
+`report.py ledger` shows one row for each run, so a failed run stays in the totals after a later run succeeds. For the latest run of an issue with a merged PR, it sets the status `merged` and fills in `human_edits`: true when a commit has an author other than "trust-factory builder".
 
 ### Trust suite
 
@@ -449,6 +449,7 @@ These are first targets. Change them after Phase 5.
 | 2026-10-09 | `trust-suite/run.sh` uses `scripts/verify.sh` | The scorecard measures the same verifier step that runs on real PRs |
 | 2026-10-09 | Fail-first is skipped for `type:docs` and `type:chore`, also when the PR changes tests | Pilot #17: removed tests "passed without the change". With that feedback, the builder added a test only to make the base fail. The verifier caught it |
 | 2026-10-09 | The `needs-person` comment lists the reasons of each attempt, and a blocked builder's summary is one reason | Pilot #17: the comment showed only the last attempt, so the verifier's catch was only in the ledger |
+| 2026-10-09 | The report shows one row for each run, not for each issue | Pilot #17 ran twice. A report by issue dropped the failed first run and its cost |
 
 ## Open questions
 

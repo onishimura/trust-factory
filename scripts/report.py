@@ -81,19 +81,23 @@ def gh(path):
 
 
 def ledger(path):
-    """Return the last record of each issue. A merged PR gets the status "merged" and human_edits."""
+    """Return the last record of each run (an issue and its start time), in the order of the runs.
+    For the latest run of an issue, a merged PR gives the status "merged" and human_edits."""
     last = {}
     for line in Path(path).read_text().splitlines():
         if line.strip():
             record = json.loads(line)
-            last[record["issue"]] = record
+            last[(record["issue"], record["started"])] = record
+    latest = {}
     for r in last.values():
+        latest[r["issue"]] = r
+    for r in latest.values():
         pr = gh("pulls/%d" % r["pr"]) if r.get("pr") else None
         if pr and pr.get("merged_at"):
             r["status"] = "merged"
             commits = gh("pulls/%d/commits" % r["pr"]) or []
             r["human_edits"] = any(c["commit"]["author"]["name"] != BUILDER for c in commits)
-    return [last[k] for k in sorted(last)]
+    return sorted(last.values(), key=lambda r: r["started"])
 
 
 def minutes(r):
@@ -114,9 +118,10 @@ def ledger_report(records):
     n = len(records) or 1
     return "\n".join(lines + [
         "",
-        "- Proposed or merged: %s of the issues." % rate(done, records),
-        "- Attempts: %.1f for each issue on average." % (sum(r["attempts"] for r in records) / n),
-        "- Tokens: %d. Cost: $%.2f. Time: %.1f minutes for each issue on average." % (
+        "- Runs: %d, for %d issues. Proposed or merged: %s of the runs." % (
+            len(records), len({r["issue"] for r in records}), rate(done, records)),
+        "- Attempts: %.1f for each run on average." % (sum(r["attempts"] for r in records) / n),
+        "- Tokens: %d. Cost: $%.2f. Time: %.1f minutes for each run on average." % (
             sum(r["tokens"] for r in records), sum(r["cost_usd"] for r in records),
             sum(minutes(r) for r in records) / n),
         "- Merged PRs with human edits: %s." % rate([r for r in merged if r.get("human_edits")], merged)])

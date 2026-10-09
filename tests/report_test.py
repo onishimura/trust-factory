@@ -116,7 +116,18 @@ class LedgerTest(unittest.TestCase):
     def reply(self, key, value):
         (self.gh / (key + ".json")).write_text(json.dumps(value))
 
-    def test_last_record_of_each_issue(self):
+    def test_each_run_is_a_row(self):
+        with self.ledger.open("a") as f:
+            f.write(json.dumps(record(42, "proposed", 1, 142, ["pass"], started="2026-10-09T11:00:00Z",
+                                      finished="2026-10-09T11:03:00Z")) + "\n")
+        self.reply("pulls-142", {"merged_at": "2026-10-09T12:00:00Z"})
+        self.reply("pulls-142-commits", [{"commit": {"author": {"name": report.BUILDER}}}])
+        records = report.ledger(self.ledger)
+        self.assertEqual([(r["issue"], r["status"], r["attempts"]) for r in records],
+                         [(42, "proposed", 2), (43, "needs-person", 1), (42, "merged", 1)])
+        self.assertIn("Runs: 3, for 2 issues.", report.ledger_report(records))
+
+    def test_last_record_of_each_run(self):
         self.reply("pulls-142", {"merged_at": None})
         records = report.ledger(self.ledger)
         self.assertEqual([(r["issue"], r["status"], r["attempts"]) for r in records],
@@ -136,8 +147,8 @@ class LedgerTest(unittest.TestCase):
         text = report.ledger_report(report.ledger(self.ledger))
         self.assertIn("| #42 | #142 | merged | 2 | fail, pass | 1000 | $0.25 | 6.0 | no |", text)
         self.assertIn("| #43 | - | needs-person | 1 | - | 1000 | $0.25 | 2.0 | - |", text)
-        self.assertIn("Proposed or merged: 1/2 (50%)", text)
-        self.assertIn("Attempts: 1.5 for each issue on average.", text)
+        self.assertIn("Runs: 2, for 2 issues. Proposed or merged: 1/2 (50%) of the runs.", text)
+        self.assertIn("Attempts: 1.5 for each run on average.", text)
         self.assertIn("Time: 4.0 minutes", text)
         self.assertIn("Merged PRs with human edits: 0/1 (0%)", text)
 
