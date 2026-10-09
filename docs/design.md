@@ -274,9 +274,9 @@ One or two sentences.
 
 - [x] Choose the name: `trust-factory`.
 - [x] Make the repo (private until Phase 6).
-- [ ] Select a pilot repo with a verify command that runs in less than two minutes.
-- [ ] Create the labels in the pilot repo.
-- [ ] Write three to five small, real issues with acceptance criteria.
+- [x] Select a pilot repo with a verify command that runs in less than two minutes: `onishimura/private-pilot` (about 20 seconds for each check).
+- [x] Create the labels in the pilot repo.
+- [x] Write three to five small, real issues with acceptance criteria: private-pilot #6 to #9.
 
 Definition of done: the pilot repo has the labels and the issues, and the verify command passes on the base branch.
 
@@ -289,7 +289,7 @@ The check script needs no agents, so ordinary tests can check it.
 - [x] Write `check.sh` and `config.example.json`.
 - [x] Write tests with local test repos and a `gh` stub. Run them with `tests/run.sh`.
 - [x] Test these cases: fail-first pass, fail-first fail (the tests pass without the change), no test changes, verify failure, protected path, head moved, base conflict.
-- [ ] Post a commit status, and test it on the pilot repo with branch protection. (The script posts the status; the pilot test waits for Phase 0.)
+- [ ] Post a commit status, and test it on the pilot repo with branch protection. (The script posts the status. The pilot is private on a free plan, so GitHub cannot enforce the status yet.)
 
 Definition of done: all test cases pass, and the script gives the correct JSON result for a real pilot PR.
 
@@ -379,10 +379,11 @@ These are first targets. Change them after Phase 5.
 | 2026-10-09 | The fixture is a small Python 3.9 package | The tests are fast, portable and easy to read |
 | 2026-10-09 | Each seeded PR must pass the fixed checks | Then the suite measures the verifier, not the check script |
 | 2026-10-09 | Publish the latest full scorecard in the repo as `trust-suite/scorecard.md` | The scorecard is the main evidence for the thesis. The same commit holds the prompt that made it |
+| 2026-10-09 | The pilot is `onishimura/private-pilot`, with the verify commands `npm ci --no-audit --no-fund` and `npm run check` | It is a real project. A full check takes about 20 seconds. Its tests are pure and need Node 24 on `PATH` |
+| 2026-10-09 | Skip branch protection on the pilot for now | The pilot is private on a free plan. In `propose` mode a person merges, and the commit status still shows on each PR |
 
 ## Open questions
 
-- Which project is the pilot? It needs a fast verify command.
 - Do we keep the state in GitHub issue labels (current design) or in plain markdown files?
 - How do we install the workflow: as a Claude Code plugin, or as files copied into the target repo?
 - How do we deny `git push` for the verifier only? Check the subagent tool and permission options.

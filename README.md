@@ -18,7 +18,7 @@ Many agent workflows show that agents can open PRs. Few of them show how often t
 
 | Phase | Goal | Status |
 |---|---|---|
-| 0 | Decisions and pilot setup | In progress |
+| 0 | Decisions and pilot setup | Done |
 | 1 | Check script and result format | In progress |
 | 2 | Builder agent | Not started |
 | 3 | Verifier agent and trust suite | Done |
