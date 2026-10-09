@@ -79,20 +79,19 @@ changed .merge.protected_paths --name-only > "$tmp/protected.txt"
 changed .checks.fail_first.test_globs --binary > "$out/tests.diff"
 
 # Fail-first: the PR's test changes, without the rest of the PR, must make a verify command fail.
-if [ -s "$out/tests.diff" ]; then
+# A docs or chore issue adds no behavior (it can even remove tests), so it skips this check.
+api "issues/$issue" > "$tmp/issue.json" || finish retry-later "could not read issue #$issue from GitHub"
+if jq -e '[.labels[].name] | any(. == "type:docs" or . == "type:chore")' "$tmp/issue.json" > /dev/null; then
+  check fail-first skipped "the issue has the label type:docs or type:chore"
+elif [ ! -s "$out/tests.diff" ]; then
+  check fail-first fail "the PR changes no test files"
+else
   git worktree add -q --detach "$tmp/base" "$mb" && git -C "$tmp/base" apply "$out/tests.diff" \
     || finish needs-person "could not apply the test changes at the merge base"
   if run_verify "$tmp/base" "$out/fail-first.log"; then
     check fail-first fail "the new tests pass without the change"
   else
     check fail-first pass "without the change, '$failed' fails"
-  fi
-else
-  api "issues/$issue" > "$tmp/issue.json" || finish retry-later "could not read issue #$issue from GitHub"
-  if jq -e '[.labels[].name] | any(. == "type:docs" or . == "type:chore")' "$tmp/issue.json" > /dev/null; then
-    check fail-first skipped "no test changes; the issue has the label type:docs or type:chore"
-  else
-    check fail-first fail "the PR changes no test files"
   fi
 fi
 

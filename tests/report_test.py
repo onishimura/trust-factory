@@ -110,7 +110,7 @@ class LedgerTest(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.ledger = self.dir / "ledger.jsonl"
         lines = [record(42, "rebuild", 1, 142, ["fail"]), record(42, "proposed", 2, 142, ["fail", "pass"]),
-                 record(43, "needs-person", 1, finished="2026-10-09T10:02:00Z")]
+                 record(43, "needs-person", 1, verdicts=[None], finished="2026-10-09T10:02:00Z")]
         self.ledger.write_text("".join(json.dumps(r) + "\n" for r in lines))
 
     def reply(self, key, value):
@@ -135,7 +135,7 @@ class LedgerTest(unittest.TestCase):
         self.reply("pulls-142-commits", [{"commit": {"author": {"name": report.BUILDER}}}])
         text = report.ledger_report(report.ledger(self.ledger))
         self.assertIn("| #42 | #142 | merged | 2 | fail, pass | 1000 | $0.25 | 6.0 | no |", text)
-        self.assertIn("| #43 | - | needs-person | 1 |  | 1000 | $0.25 | 2.0 | - |", text)
+        self.assertIn("| #43 | - | needs-person | 1 | - | 1000 | $0.25 | 2.0 | - |", text)
         self.assertIn("Proposed or merged: 1/2 (50%)", text)
         self.assertIn("Attempts: 1.5 for each issue on average.", text)
         self.assertIn("Time: 4.0 minutes", text)

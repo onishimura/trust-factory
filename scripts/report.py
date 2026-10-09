@@ -107,7 +107,7 @@ def ledger_report(records):
     for r in records:
         lines.append("| #%d | %s | %s | %d | %s | %d | $%.2f | %.1f | %s |" % (
             r["issue"], "#%d" % r["pr"] if r.get("pr") else "-", r["status"], r["attempts"],
-            ", ".join(str(v) for v in r["verdicts"]), r["tokens"], r["cost_usd"], minutes(r),
+            ", ".join(v or "-" for v in r["verdicts"]), r["tokens"], r["cost_usd"], minutes(r),
             {True: "yes", False: "no"}.get(r.get("human_edits"), "-")))
     done = [r for r in records if r["status"] in ("proposed", "merged")]
     merged = [r for r in records if r["status"] == "merged"]

@@ -107,10 +107,11 @@ test_issue_without_criteria() {
 }
 
 test_builder_blocked() {
-  echo '{"status": "blocked", "title": "x", "summary": "A criterion needs a protected path."}' > "$CLAUDE_STUB_DIR/output.json"
+  echo '{"status": "blocked", "title": "x", "summary": "## Summary\nA criterion needs a protected path.\n\n## How to unblock\n- Allow it."}' \
+    > "$CLAUDE_STUB_DIR/output.json"
   run_build
   expect status "$(field .status)" needs-person
-  contains reason "$(field .reason)" "needs a protected path"
+  expect reason "$(field .reason)" "the builder is blocked: Summary A criterion needs a protected path. How to unblock - Allow it."
   git -C "$T/origin.git" rev-parse -q --verify agent/42 > /dev/null && fail "the branch was pushed"
   expect "PR posts" "$(pr_posts)" 0
 }

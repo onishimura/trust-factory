@@ -98,7 +98,7 @@ New tests must fail without the change and pass with it.
 
 The config has no command for single tests, so step 2 runs all the verify commands. A failure in step 2 has meaning only when the base passes its verify commands. Phase 0 and the merge rule keep the base in that state.
 
-If the PR has no test changes, the check fails, except for issues with the label `type:docs` or `type:chore`. Then the result is "skipped", and the reason goes into the result.
+For an issue with the label `type:docs` or `type:chore`, the result is "skipped", also when the PR changes tests. Such an issue adds no behavior, and it can remove tests. The verifier still looks for weakened tests. For other issues, a PR without test changes fails the check.
 
 ### Criteria map (verifier output)
 
@@ -238,7 +238,7 @@ An attempt does these steps:
 | Build or check `needs-person`, verifier `unsure`, or a criteria map that is not valid | `needs-person` | `agent:needs-person` |
 | Build, check or verifier `retry-later` | No ledger line | No change |
 
-For `needs-person`, the script adds a comment to the issue with the reasons. A rebuild starts again from the base, and the builder gets the reasons: the failed checks, the criteria that are not met, and the concerns.
+For `needs-person`, the script adds a comment to the issue with the reasons of each attempt in the run. A rebuild starts again from the base, and the builder gets the reasons: the failed checks, the criteria that are not met, and the concerns.
 
 ### Run ledger
 
@@ -447,6 +447,8 @@ These are first targets. Change them after Phase 5.
 | 2026-10-09 | The ledger adds one line for each finished attempt; the last line of an issue is its record | The file is append-only, so a stop cannot damage it, and a resume finds the attempt count |
 | 2026-10-09 | A resumed issue starts its attempt again from the build | It is simple and correct. A stopped attempt left no ledger line |
 | 2026-10-09 | `trust-suite/run.sh` uses `scripts/verify.sh` | The scorecard measures the same verifier step that runs on real PRs |
+| 2026-10-09 | Fail-first is skipped for `type:docs` and `type:chore`, also when the PR changes tests | Pilot #17: removed tests "passed without the change". With that feedback, the builder added a test only to make the base fail. The verifier caught it |
+| 2026-10-09 | The `needs-person` comment lists the reasons of each attempt, and a blocked builder's summary is one reason | Pilot #17: the comment showed only the last attempt, so the verifier's catch was only in the ledger |
 
 ## Open questions
 

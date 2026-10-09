@@ -75,7 +75,8 @@ jq -e .structured_output "$tmp/run.json" > "$tmp/out.json" 2> /dev/null || finis
 head=$(git -C "$wt" rev-parse HEAD)
 
 # Check the builder's work before anything leaves this machine.
-[ "$(out .status)" = done ] || finish needs-person "the builder is blocked: $(out .summary)"
+[ "$(out .status)" = done ] \
+  || finish needs-person "the builder is blocked: $(out '.summary | gsub("#+ "; "") | gsub("\\s*\n\\s*"; " ")')"
 [ "$(git -C "$wt" symbolic-ref -q --short HEAD)" = "$branch" ] || finish needs-person "the builder left the branch $branch"
 [ -z "$(git -C "$wt" status --porcelain)" ] || finish needs-person "the builder left uncommitted changes"
 git merge-base --is-ancestor "$base_sha" "$head" && [ "$head" != "$base_sha" ] \

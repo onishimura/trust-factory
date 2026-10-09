@@ -118,7 +118,8 @@ test_attempt_limit_goes_to_a_person() {
   factory run
   expect labels "$(labels_of 42)" bug,agent:needs-person
   expect ledger "$(ledger 'map(.status)')" '["rebuild","needs-person"]'
-  contains comment "$(cat "$T/gh/issues-42-comments.input")" "the attempt limit (2) is reached"
+  contains comment "$(cat "$T/gh/issues-42-comments.input")" $'Attempt 1:\n- criterion not met: sub 5 3 prints 2 (missing)'
+  contains comment "$(cat "$T/gh/issues-42-comments.input")" $'Attempt 2:\n- criterion not met: sub 5 3 prints 2 (missing)\n- the attempt limit (2) is reached'
   expect "verifier status" "$(status_of trust-factory/verifier)" failure
 }
 

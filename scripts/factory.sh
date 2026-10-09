@@ -50,8 +50,9 @@ done_attempt() { # STATUS: write the ledger line and set the label. The reasons 
     rebuild) label "$n" agent:ready ;;
     proposed) label "$n" agent:proposed ;;
     *) label "$n" agent:needs-person
-      jq -r '"trust-factory needs a person for this issue:\n\n" + (.reasons | map("- " + .) | join("\n"))' <<< "$record" \
-        | api "issues/$n/comments" -X POST -F body=@- > /dev/null ;;
+      jq -sr --argjson n "$n" --arg s "$(jq -r .started <<< "$record")" '"trust-factory needs a person for this issue.\n"
+        + (map(select(.issue == $n and .started == $s) | "\nAttempt \(.attempts):\n" + (.reasons | map("- " + .) | join("\n")))
+        | join("\n"))' "$ledger" | api "issues/$n/comments" -X POST -F body=@- > /dev/null ;;
   esac
 }
 
@@ -109,9 +110,8 @@ issue() { # ISSUE: one attempt: build, check, verify, decide
   api "statuses/$commit" -X POST -f state="$([ "$verdict" = pass ] && echo success || echo failure)" \
     -f context=trust-factory/verifier -f description="verifier: $verdict" > /dev/null
   evidence
-  jq -r '(.criteria // [])[] | select(.met != true) | "criterion not met: \(.criterion) (\(.evidence))"' \
-    "$dir/verify/verdict.json" > "$dir/reasons.txt" 2> /dev/null
-  jq -r '(.concerns // [])[]' "$dir/verify/verdict.json" >> "$dir/reasons.txt" 2> /dev/null
+  jq -r '((.criteria // [])[] | select(.met != true) | "criterion not met: \(.criterion) (\(.evidence))"),
+    (.concerns // [])[] | gsub("\\s*\n\\s*"; " ")' "$dir/verify/verdict.json" > "$dir/reasons.txt" 2> /dev/null
   case $verdict in
     pass) gh pr ready "$pr" > /dev/null 2>&1; done_attempt proposed ;;
     fail) done_attempt rebuild ;;

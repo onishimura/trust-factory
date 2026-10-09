@@ -72,6 +72,17 @@ test_docs_issue_skips_fail_first() {
   expect verify "$(check_of verify)" pass
 }
 
+test_chore_issue_with_test_changes_skips_fail_first() {
+  branch agent/42
+  rm "$T/work/math.test.sh" && put zero.test.sh '. ./math.sh && [ "$(add 0 0)" = 0 ]'
+  commit "Move the add test" && open_pr
+  echo '{"number": 42, "labels": [{"name": "type:chore"}]}' > "$T/gh/issues-42.json"
+  run_check
+  expect status "$(result .status)" proposed
+  expect fail-first "$(check_of fail-first)" skipped
+  contains detail "$(result '.checks[0].detail')" "type:chore"
+}
+
 test_verify_failure() {
   branch agent/42 && add_sub
   put sub.sh 'sub() { echo $(($1 + $2)); }'
