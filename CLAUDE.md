@@ -6,7 +6,7 @@ A small Claude Code workflow that builds GitHub issues with agents and measures 
 
 ## Clean-room rule
 
-This repo is a public showcase of original work. Write every file from `docs/design.md` and your own reasoning. The projects in the README "Inspiration" section are sources of ideas only: do not open, fetch or copy their source code, and do not reuse their names, layouts, config keys, exit codes or eval cases. If a task seems to need another project's code, stop and ask.
+This repo is a public showcase of original work. Write every file from `docs/design.md` and your own reasoning. The projects in `ACKNOWLEDGMENTS.md` are sources of ideas only: do not open, fetch or copy their source code, and do not reuse their names, layouts, config keys, exit codes or eval cases. If a task seems to need another project's code, stop and ask.
 
 ## Working rules
 

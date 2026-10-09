@@ -109,16 +109,9 @@ tests/run.sh
 
 The tests are offline. They use local git repos and stubs for `gh` and `claude`. The rules for this repo are in [`CLAUDE.md`](CLAUDE.md).
 
-## Inspiration
+## Acknowledgments
 
-These projects and articles gave ideas. trust-factory uses none of their code.
-
-- [super-board](https://github.com/EricTechPro/super-board) by Eric Tech: a board-driven build, check and merge loop, and the rule to verify the exact commit against the current base.
-- [How to Run a Gauntlet Loop](https://somethingbig.ai/gauntlet-loop) by Matt Shumer: the builder never grades its own work, and the critic inspects the real output.
-- [Harness Engineering for Self-Improvement](https://lilianweng.github.io/posts/2026-07-04-harness/) by Lilian Weng: keep the evaluator outside the editable surface.
-- [Grok Ship](https://x.com/kunchenguid/status/2090463366762676732) by Kun Chen: fresh-context adversarial review.
-- [AI-native workshop](https://github.com/workos/aie-ai-native-workshop) by WorkOS: goals and verification gates.
-- [ai-tasks](https://github.com/onishimura/ai-tasks): my earlier plain-file task system for coding agents.
+trust-factory takes ideas from other projects and articles, but none of their code. [`ACKNOWLEDGMENTS.md`](ACKNOWLEDGMENTS.md) names each source, its idea and where the design uses it.
 
 ## License
 

@@ -385,7 +385,7 @@ Definition of done: a written decision about auto-merge, with the ledger data an
 ### Phase 6: Publish
 
 - [x] Choose a license: MIT.
-- [x] Write the README: the thesis, a quick start, the scorecard, the ledger report and the credits.
+- [x] Write the README: the thesis, a quick start, the scorecard, the ledger report and the credits. The credits link to [`ACKNOWLEDGMENTS.md`](../ACKNOWLEDGMENTS.md).
 - [x] Add a short demo: one issue from `agent:ready` to a proposed PR, with its evidence. See [`docs/demo.md`](demo.md).
 - [ ] Make the repo public.
 
@@ -457,6 +457,7 @@ These are first targets. Change them after Phase 5.
 | 2026-10-09 | The core budget is approximately 760 lines | The setup script (35 lines) is part of v1 scope. The core is 752 lines |
 | 2026-10-09 | A public demo repo, `onishimura/trust-factory-demo`, holds the demo and the branch-protection test | The pilot is private on a free plan, so it has no branch protection. The demo shows real output that anyone can open |
 | 2026-10-09 | `build.sh` changes `\n` escapes into line breaks when a summary has no line break | Demo run 1: the PR body showed the characters `\n` |
+| 2026-10-09 | The credits move from the README to `ACKNOWLEDGMENTS.md`, with each idea linked to the part of the design that uses it | The README stays short, and the credits show how each idea shaped the design |
 | 2026-10-09 | Before the repo goes public, the history uses the owner's GitHub no-reply email and calls the pilot `private-pilot` | The owner's email and the name of the private pilot repo must not become public |
 
 ## Open questions
